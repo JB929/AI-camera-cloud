@@ -1,0 +1,38 @@
+<!-- templates/dashboard.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>AI Camera Dashboard</title>
+  <style> /* keep your styles or paste the previous template style */ </style>
+</head>
+<body>
+  <header>
+    <h1>📸 AI Camera Dashboard</h1>
+    <div>Logged in as: <strong>{{ user }}</strong> | <a href="/logout">Logout</a></div>
+  </header>
+
+  <button id="enable-sound">🔊 Enable Alert Sound</button>
+  <button id="test-sound">🔈 Test Sound</button>
+
+  <div class="grid" id="grid">
+    {% for cam, info in camera_status.items() %}
+      <div class="card" id="card-{{ cam }}">
+        <h3>{{ cam }}</h3>
+        {% if info.last_snapshot %}
+          <img src="{{ info.last_snapshot }}" style="width:100%;height:200px;object-fit:cover">
+        {% else %}
+          <div style="width:100%;height:200px;background:#222;display:flex;align-items:center;justify-content:center;color:#888">No snapshot yet</div>
+        {% endif %}
+        <div>Status: {% if info.status=='online' %}🟢{% else %}🔴{% endif %} Last seen: {{ info.last_seen }}</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <script>
+    // inline Base64 beep + polling — same logic you had earlier
+    // (paste the exact script you used previously)
+  </script>
+</body>
+</html>
+
