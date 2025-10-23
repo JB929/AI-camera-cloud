@@ -8,8 +8,8 @@ import os
 # === CONFIG ===
 MODEL_PATH = "yolov8n.pt"
 CAMERA_INDEX = 0  # change if using external webcam
-TELEGRAM_BOT_TOKEN = "7413316725:AAG2nF6IxNOcFPqcC9zTKroqFQfmcvFYV58"
-CHAT_ID = "6369686172"
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+CHAT_ID = os.environ.get("CHAT_ID")
 DETECTION_ZONE = (100, 100, 500, 400)  # x1, y1, x2, y2
 OVERLAP_THRESHOLD = 0.2  # trigger if 20% of person inside zone
 
