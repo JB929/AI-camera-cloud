@@ -1,27 +1,38 @@
-# models.py
-from sqlmodel import SQLModel, Field
-from typing import Optional
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy.orm import relationship
 from datetime import datetime
+from database import Base
+
+# ✅ User table
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50), unique=True, index=True)
+    hashed_password = Column(String(255))
 
 
-class User(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    username: str = Field(index=True, unique=True)
-    hashed_password: str
+# ✅ Camera table
+class Camera(Base):
+    __tablename__ = "cameras"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50))
+    location = Column(String(100))
+    user_id = Column(Integer, ForeignKey("users.id"))
+
+    user = relationship("User", backref="cameras")
 
 
-class Alert(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    camera: str
-    message: str
-    timestamp: str  # store as text for readability; can use datetime if preferred
-    snapshot_path: Optional[str] = None
+# ✅ Alert table
+class Alert(Base):
+    __tablename__ = "alerts"
 
+    id = Column(Integer, primary_key=True, index=True)
+    message = Column(Text)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    camera_id = Column(Integer, ForeignKey("cameras.id"))
+    snapshot_path = Column(String(255))
 
-class CameraStatus(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    camera: str = Field(index=True, unique=True)
-    status: str
-    last_seen: Optional[str] = None
-    last_snapshot: Optional[str] = None
+    camera = relationship("Camera", backref="alerts")
 

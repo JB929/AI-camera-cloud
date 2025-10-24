@@ -1,25 +1,22 @@
-# AI Smart Camera Surveillance System 🎥🧠
+k# 🛰️ AI Smart Camera Cloud Surveillance System  
 
-A fully automated, AI-powered, multi-camera surveillance system that detects people, sends Telegram alerts, and streams live to a cloud dashboard.
+### 🚀 Real-time Multi-Camera AI Security with YOLOv8, FastAPI & Cloud Dashboard  
 
-## 🚀 Features
-- Real-time person detection with YOLOv8
-- Cloud dashboard for monitoring multiple cameras
-- Telegram alerts with snapshots
-- Secure API integration
-- Optional zone-based detection
-- Multi-camera & RTSP support
+![AI Camera Dashboard](docs/banner.png)
 
-## 🧰 Tech Stack
-- **Python 3.11+**
-- **FastAPI** (Dashboard backend)
-- **OpenCV + Ultralytics YOLO**
-- **SQLite / JSON storage**
-- **Telegram Bot API**
+---
 
-## ⚙️ Setup Instructions
-```bash
-git clone https://github.com/YOUR_USERNAME/ai-camera-cloud.git
-cd ai-camera-cloud
-pip install -r requirements.txt
+## 🧩 Overview  
+
+**AI Smart Camera Cloud Surveillance** is an end-to-end computer vision system that turns any webcam or IP CCTV camera into an intelligent security sensor.  
+It detects people and motion zones in real-time using **YOLOv8** and instantly:  
+- 🔔 Sends alerts with snapshots to Telegram  
+- ☁️ Uploads detections to a **FastAPI Cloud Dashboard**  
+- 🖥️ Displays a live dashboard with real-time video tiles and zone status  
+- 🧭 Supports multiple cameras simultaneously  
+
+---
+
+## 🧱 System Architecture  
+
 
