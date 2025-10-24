@@ -1,38 +1,36 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+# dashboard_server/models.py
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from datetime import datetime
-from database import Base
+from dashboard_server.database import Base  # ✅ fixed absolute import
+import datetime
 
-# ✅ User table
+
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), unique=True, index=True)
-    hashed_password = Column(String(255))
+    username = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
-# ✅ Camera table
 class Camera(Base):
     __tablename__ = "cameras"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(50))
-    location = Column(String(100))
-    user_id = Column(Integer, ForeignKey("users.id"))
+    name = Column(String, nullable=False)
+    rtsp_url = Column(String, nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    user = relationship("User", backref="cameras")
+    owner = relationship("User")
 
 
-# ✅ Alert table
 class Alert(Base):
     __tablename__ = "alerts"
 
     id = Column(Integer, primary_key=True, index=True)
-    message = Column(Text)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    camera_id = Column(Integer, ForeignKey("cameras.id"))
-    snapshot_path = Column(String(255))
-
-    camera = relationship("Camera", backref="alerts")
+    message = Column(String, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    camera_name = Column(String, nullable=False)
 
