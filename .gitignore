@@ -1,0 +1,27 @@
+# Python cache and environment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+env/
+venv/
+ai_camera_cloud_env/
+
+# macOS system files
+.DS_Store
+
+# Secrets or local config
+config.json
+*.sqlite3
+*.db
+*.pem
+*.crt
+*.key
+
+# Credentials or private keys
+*.env
+*.secret
+*.token
+
