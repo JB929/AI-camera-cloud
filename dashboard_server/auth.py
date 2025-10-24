@@ -1,73 +1,69 @@
-# auth.py (final fixed for macOS + Python 3.13)
-from fastapi import APIRouter, Form, Request
-from fastapi.responses import RedirectResponse, HTMLResponse
-from starlette.status import HTTP_302_FOUND
+from fastapi import APIRouter, Depends, HTTPException, status, Form
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
-from sqlmodel import select
-from db import get_session, init_db
-from models import User
+from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
+from jose import jwt, JWTError
+
+# ✅ Correct import path (Render-safe)
+from dashboard_server.database import get_session, init_db
+from dashboard_server.models import User
 
 router = APIRouter()
-# Use argon2 instead of bcrypt for macOS stability
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+SECRET_KEY = "supersecretkey"  # You can store in Render Environment variables later
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-# Ensure database is initialized
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
+
+# Initialize DB
 init_db()
 
-def ensure_default_admin():
-    """Create admin user safely with argon2 (no 72-byte limit)."""
-    with get_session() as sess:
-        stmt = select(User).where(User.username == "admin")
-        res = sess.exec(stmt).first()
-        if not res:
-            password = "admin123"
-            hashed = pwd_context.hash(password)
-            user = User(username="admin", hashed_password=hashed)
-            sess.add(user)
-            sess.commit()
 
-ensure_default_admin()
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
 
-@router.get("/login", response_class=HTMLResponse)
-async def login_form(request: Request):
-    return """
-    <html><body style='font-family:sans-serif;text-align:center;margin-top:10%'>
-      <h2>AI Monitor Login</h2>
-      <form action='/login' method='post'>
-        <input name='username' placeholder='Username'><br><br>
-        <input type='password' name='password' placeholder='Password'><br><br>
-        <button type='submit'>Login</button>
-      </form>
-    </body></html>
-    """
 
-@router.post("/login")
-async def login(request: Request, username: str = Form(...), password: str = Form(...)):
-    from db import get_session
-    with get_session() as sess:
-        stmt = select(User).where(User.username == username)
-        user = sess.exec(stmt).first()
-        if user and pwd_context.verify(password, user.hashed_password):
-            response = RedirectResponse(url="/", status_code=HTTP_302_FOUND)
-            response.set_cookie(key="user", value=username, httponly=True)
-            return response
-    return RedirectResponse(url="/login", status_code=HTTP_302_FOUND)
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
-@router.get("/logout")
-async def logout():
-    response = RedirectResponse(url="/login", status_code=HTTP_302_FOUND)
-    response.delete_cookie("user")
-    return response
 
-def get_current_user(request: Request):
-    username = request.cookies.get("user")
-    if not username:
-        return None
-    from db import get_session
-    with get_session() as sess:
-        stmt = select(User).where(User.username == username)
-        user = sess.exec(stmt).first()
-        if not user:
-            return None
-    return username
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+@router.post("/token")
+def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_session)):
+    user = db.query(User).filter(User.username == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+
+    access_token = create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_session)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    user = db.query(User).filter(User.username == username).first()
+    if user is None:
+        raise credentials_exception
+    return user
 
