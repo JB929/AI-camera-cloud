@@ -39,35 +39,26 @@ async def dashboard(request: Request, db: Session = Depends(SessionLocal), user:
     })
 
 
-@app.post("/alerts/")
-async def receive_alert(
-    message: str = Form(...),
-    camera: str = Form(...),
-    timestamp: str = Form(...),
-    snapshot: UploadFile = File(None),
-    db: Session = Depends(SessionLocal)
-):
-    """
-    Endpoint to receive alerts from AI detector clients
-    """
-    snapshot_path = None
-    if snapshot:
-        os.makedirs("dashboard_server/static/snapshots", exist_ok=True)
-        snapshot_path = f"dashboard_server/static/snapshots/{snapshot.filename}"
-        with open(snapshot_path, "wb") as f:
-            f.write(await snapshot.read())
+@app.post("/api/alerts")
+async def receive_alert(request: Request):
+    try:
+        data = await request.json()
+    except Exception:
+        return {"error": "Invalid JSON"}
 
-    alert = Alert(
-        message=message,
-        camera=camera,
-        timestamp=datetime.now(),
-        snapshot_path=snapshot_path
-    )
-    db.add(alert)
+    camera_name = data.get("camera_name", "Unknown_Camera")
+    timestamp = data.get("timestamp", str(datetime.datetime.now()))
+
+    print(f"🚨 ALERT RECEIVED: {camera_name} at {timestamp}")
+
+    # ✅ Log alert to database (optional)
+    db = SessionLocal()
+    new_alert = Alert(camera_name=camera_name, timestamp=timestamp)
+    db.add(new_alert)
     db.commit()
+    db.close()
 
-    return {"status": "Alert received", "camera": camera, "message": message}
-
+    return {"status": "✅ Alert received successfully"}
 
 @app.get("/health")
 async def health_check():
