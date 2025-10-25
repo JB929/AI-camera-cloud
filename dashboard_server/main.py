@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Request, Depends, Form, UploadFile, File
+from fastapi import FastAPI, Request, Depends, Form, UploadFile, File 
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -71,4 +72,52 @@ async def receive_alert(
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "time": datetime.now().isoformat()}
+from fastapi import BackgroundTasks, Request
+import datetime
+
+@app.post("/api/alerts")
+async def receive_alert(request: Request, background_tasks: BackgroundTasks):
+    try:
+        data = await request.json()
+    except Exception:
+        return {"error": "Invalid JSON"}
+
+    camera_name = data.get("camera_name", "Unknown_Camera")
+    timestamp = data.get("timestamp", str(datetime.datetime.now()))
+
+    print(f"🚨 ALERT RECEIVED: {camera_name} at {timestamp}")
+
+    # Log to file for testing
+    with open("alerts.log", "a") as log:
+        log.write(f"{timestamp} | {camera_name}\n")
+
+    return {"status": "✅ Alert received successfully"}
+
+from fastapi import BackgroundTasks
+import datetime
+
+@app.post("/api/alerts")
+async def receive_alert(request: Request, background_tasks: BackgroundTasks):
+    try:
+        data = await request.json()
+    except Exception:
+        return {"error": "Invalid JSON"}
+
+    camera_name = data.get("camera_name", "Unknown_Camera")
+    timestamp = data.get("timestamp", str(datetime.datetime.now()))
+
+    print(f"🚨 ALERT RECEIVED: {camera_name} at {timestamp}")
+
+    # ✅ Optional: Log alerts to your database
+    db = SessionLocal()
+    new_alert = Alert(camera_name=camera_name, timestamp=timestamp)
+    db.add(new_alert)
+    db.commit()
+    db.close()
+
+    # ✅ Optional: Log to file
+    with open("alerts.log", "a") as log:
+        log.write(f"{timestamp} | {camera_name}\n")
+
+    return {"status": "✅ Alert received successfully"}
 
