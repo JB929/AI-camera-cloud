@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Camera Alerts</title>
+    <meta http-equiv="refresh" content="5">
+    <style>
+        body {
+            background-color: #0b0b0b;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', sans-serif;
+            padding: 30px;
+        }
+        h1 {
+            color: #00ff99;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #1a1a1a;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #00ff99;
+            color: #000;
+        }
+        tr:nth-child(even) {
+            background-color: #222;
+        }
+        .time {
+            color: #00ff99;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚨 Live AI Camera Alerts</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Camera Name</th>
+                <th>Detection Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for alert in alerts %}
+            <tr>
+                <td>{{ alert.id }}</td>
+                <td>{{ alert.camera_name }}</td>
+                <td class="time">{{ alert.timestamp }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" style="text-align:center;">No alerts yet</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
+

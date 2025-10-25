@@ -64,7 +64,20 @@ async def receive_alert(request: Request):
         f.write(f"{timestamp} | {camera_name}\n")
 
     return {"status": "✅ Alert received successfully"}
+@app.get("/alerts", response_class=HTMLResponse)
+async def view_alerts(request: Request):
+    """
+    🧠 Simple UI to view all saved alerts from database.
+    Auto-refreshes every 5 seconds.
+    """
+    db = SessionLocal()
+    alerts = db.query(Alert).order_by(Alert.id.desc()).limit(50).all()
+    db.close()
 
+    return templates.TemplateResponse(
+        "alerts.html",
+        {"request": request, "alerts": alerts}
+    )
 # --- HOMEPAGE ---
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
