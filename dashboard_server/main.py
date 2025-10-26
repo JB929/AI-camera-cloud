@@ -46,14 +46,45 @@ async def dashboard(request: Request):
 
 
 # ⚙️ API to Receive Alerts from Detector
-@app.post("/api/alerts")
-async def receive_alert(camera_name: str = Form(...), timestamp: str = Form(...)):
-    db = SessionLocal()
-    alert = Alert(camera_name=camera_name, timestamp=timestamp)
-    db.add(alert)
-    db.commit()
-    return {"status": "success", "message": "Alert stored successfully."}
+from pydantic import BaseModel
 
+class AlertRequest(BaseModel):
+    camera_name: str
+    timestamp: str
+
+from pydantic import BaseModel
+from fastapi import FastAPI, Depends
+from sqlalchemy.orm import Session
+from dashboard_server.database import SessionLocal
+from dashboard_server.models import Alert, Base
+from datetime import datetime
+
+# ✅ Create DB tables if not existing
+Base.metadata.create_all(bind=SessionLocal().bind)
+
+app = FastAPI()
+
+# ✅ Define a Pydantic model for JSON body
+class AlertRequest(BaseModel):
+    camera_name: str
+    timestamp: str
+
+# ✅ Define a dependency to get DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# ✅ Corrected POST endpoint
+@app.post("/api/alerts")
+def receive_alert(request: AlertRequest, db: Session = Depends(get_db)):
+    new_alert = Alert(camera_name=request.camera_name, timestamp=request.timestamp)
+    db.add(new_alert)
+    db.commit()
+    print(f"✅ Cloud Alert Saved: {request.camera_name} at {request.timestamp}")
+    return {"message": "Alert received successfully!"}
 
 # 📡 API to Fetch Alerts (for dashboard)
 @app.get("/api/alerts")
