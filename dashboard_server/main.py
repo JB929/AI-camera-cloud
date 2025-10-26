@@ -1,23 +1,23 @@
-from fastapi import FastAPI, Request, Form, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, Request, Depends, Form
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from datetime import datetime
 import os
 
-# ✅ Import local modules using absolute paths
-from dashboard_server.auth import router as auth_router
+# ✅ Import project modules
 from dashboard_server.database import SessionLocal, engine
 from dashboard_server.models import Base, Alert
+from dashboard_server.auth import get_current_user
 
-# Initialize DB
+# Initialize database
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="AI Camera Cloud Dashboard")
+app = FastAPI(title="AI Camera Cloud")
 
-# Allow camera client to send alerts
+# Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,60 +26,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files for UI
+# Static & Templates
 app.mount("/static", StaticFiles(directory="dashboard_server/static"), name="static")
-
 templates = Jinja2Templates(directory="dashboard_server/templates")
 
-# --- AUTH ROUTES ---
-# (Protected login/dashboard features)
-app.include_router(auth_router, prefix="/auth")
 
-# --- PUBLIC ALERT ENDPOINT ---
-@app.post("/api/alerts")
-async def receive_alert(request: Request):
-    """
-    ✅ Public endpoint for AI cameras to send alerts.
-    Does NOT require authentication.
-    """
-    try:
-        data = await request.json()
-    except Exception:
-        return {"error": "Invalid JSON"}
-
-    camera_name = data.get("camera_name", "Unknown_Camera")
-    timestamp = data.get("timestamp", str(datetime.now()))
-
-    print(f"🚨 ALERT RECEIVED: {camera_name} at {timestamp}")
-
-    # Save to database
-    db = SessionLocal()
-    new_alert = Alert(camera_name=camera_name, timestamp=timestamp)
-    db.add(new_alert)
-    db.commit()
-    db.close()
-
-    # Optional log
-    with open("alerts.log", "a") as f:
-        f.write(f"{timestamp} | {camera_name}\n")
-
-    return {"status": "✅ Alert received successfully"}
-@app.get("/alerts", response_class=HTMLResponse)
-async def view_alerts(request: Request):
-    """
-    🧠 Simple UI to view all saved alerts from database.
-    Auto-refreshes every 5 seconds.
-    """
-    db = SessionLocal()
-    alerts = db.query(Alert).order_by(Alert.id.desc()).limit(50).all()
-    db.close()
-
-    return templates.TemplateResponse(
-        "alerts.html",
-        {"request": request, "alerts": alerts}
-    )
-# --- HOMEPAGE ---
+# 🏠 Root Route
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+# 📋 Dashboard Page
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    db = SessionLocal()
+    alerts = db.query(Alert).order_by(Alert.timestamp.desc()).all()
+    return templates.TemplateResponse("dashboard.html", {"request": request, "alerts": alerts})
+
+
+# ⚙️ API to Receive Alerts from Detector
+@app.post("/api/alerts")
+async def receive_alert(camera_name: str = Form(...), timestamp: str = Form(...)):
+    db = SessionLocal()
+    alert = Alert(camera_name=camera_name, timestamp=timestamp)
+    db.add(alert)
+    db.commit()
+    return {"status": "success", "message": "Alert stored successfully."}
+
+
+# 📡 API to Fetch Alerts (for dashboard)
+@app.get("/api/alerts")
+async def get_alerts():
+    db = SessionLocal()
+    alerts = db.query(Alert).order_by(Alert.timestamp.desc()).all()
+    return [{"camera_name": a.camera_name, "timestamp": a.timestamp.strftime("%Y-%m-%d %H:%M:%S")} for a in alerts]
 
