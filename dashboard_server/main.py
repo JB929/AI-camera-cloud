@@ -16,6 +16,18 @@ from dashboard_server.auth import get_current_user
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="AI Camera Cloud")
+@app.get("/", response_class=HTMLResponse)
+def home():
+    return """
+    <html>
+        <head><title>AI Camera Cloud</title></head>
+        <body style='font-family: sans-serif; text-align:center; margin-top:50px;'>
+            <h1>🚀 AI Camera Cloud Backend is Running!</h1>
+            <p>Use <a href="/dashboard">/dashboard</a> to view alerts</p>
+            <p>API endpoint: <code>/api/alerts</code></p>
+        </body>
+    </html>
+    """
 
 # Middleware
 app.add_middleware(
