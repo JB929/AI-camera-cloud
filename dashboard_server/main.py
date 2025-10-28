@@ -39,65 +39,67 @@ app.mount("/static", StaticFiles(directory="dashboard_server/static"), name="sta
 # ✅ API ROUTES
 # ============================================================
 
+from fastapi import FastAPI, Form, File, UploadFile, Depends, Request, Query
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
+from datetime import datetime
+import os
+
+from dashboard_server.database import SessionLocal, engine
+from dashboard_server.models import Base, Alert
+
+Base.metadata.create_all(bind=engine)
+app = FastAPI()
+
+
 @app.post("/api/alerts")
 async def receive_alert(
     camera_name: str = Form(...),
     timestamp: str = Form(...),
     snapshot: UploadFile = File(None),
+    local_kw: str = Form(None),
+    local_kw_query: str = Query(None),  # ✅ Accepts from query too
     db: Session = Depends(SessionLocal)
 ):
     """
-    Receive alerts from the AI detector (camera_name, timestamp, optional snapshot)
-    and store them in the database + static folder.
+    Receives alerts from the camera detector.
+    Handles both Form and Query input for local_kw.
     """
     try:
-        # Convert timestamp string (HH:MM:SS) → datetime (today's date)
-        now = datetime.now()
-        timestamp_dt = datetime.combine(now.date(), datetime.strptime(timestamp, "%H:%M:%S").time())
+        # ✅ Prefer Form value, fallback to Query if missing
+        local_kw_value = local_kw or local_kw_query or "unknown"
 
-        # Save snapshot image if provided
-        snapshot_filename = None
+        # ✅ Ensure timestamp format is valid
+        try:
+            timestamp_obj = datetime.fromisoformat(timestamp)
+        except ValueError:
+            timestamp_obj = datetime.now()
+
+        # ✅ Save snapshot if received
+        file_path = None
         if snapshot:
-            folder = "dashboard_server/static/snapshots"
+            folder = "snapshots"
             os.makedirs(folder, exist_ok=True)
-            snapshot_filename = f"{camera_name}_{int(datetime.now().timestamp())}.jpg"
-            snapshot_path = os.path.join(folder, snapshot_filename)
+            file_path = os.path.join(folder, snapshot.filename)
+            with open(file_path, "wb") as buffer:
+                buffer.write(await snapshot.read())
 
-            with open(snapshot_path, "wb") as f:
-                f.write(await snapshot.read())
-
-        # Create alert record
+        # ✅ Save alert in database
         new_alert = Alert(
             camera_name=camera_name,
-            timestamp=timestamp_dt,
-            message=f"Person detected at {timestamp}",
+            timestamp=timestamp_obj,
+            message=f"Person detected ({local_kw_value})"
         )
         db.add(new_alert)
         db.commit()
-        db.refresh(new_alert)
 
-        print(f"[SERVER] ✅ Alert saved from {camera_name} at {timestamp}")
-        return {
-            "status": "success",
-            "id": new_alert.id,
-            "camera_name": camera_name,
-            "timestamp": timestamp,
-            "snapshot": snapshot_filename
-        }
+        print(f"[SERVER] Alert stored for {camera_name} at {timestamp_obj}")
+        return JSONResponse(content={"status": "success", "camera_name": camera_name})
 
     except Exception as e:
-        print(f"[SERVER ERROR] ❌ {str(e)}")
-        return {"status": "error", "message": str(e)}
-
-
-@app.get("/api/alerts")
-def get_alerts(db: Session = Depends(SessionLocal)):
-    """
-    Fetch all saved alerts as JSON.
-    """
-    alerts = db.query(Alert).order_by(Alert.id.desc()).all()
-    return alerts
-
+        db.rollback()
+        print(f"[ERROR] {e}")
+        return JSONResponse(content={"status": "error", "detail": str(e)}, status_code=500)
 
 # ============================================================
 # ✅ DASHBOARD ROUTE

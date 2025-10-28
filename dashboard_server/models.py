@@ -1,17 +1,14 @@
-# dashboard_server/models.py
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
-from dashboard_server.database import Base  # ✅ fixed absolute import
-import datetime
+from sqlalchemy import Column, Integer, String, DateTime
+from dashboard_server.database import Base
+from datetime import datetime
 
-
-class User(Base):
-    __tablename__ = "users"
+class Alert(Base):
+    __tablename__ = "alerts"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    camera_name = Column(String, nullable=False)
+    message = Column(String, nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
 
 
 class Camera(Base):
