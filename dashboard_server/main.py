@@ -1,130 +1,139 @@
-from fastapi import FastAPI, Request, Depends, Form
+from fastapi import FastAPI, Request, Depends, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from datetime import datetime
 import os
 
-# Import your app modules
+# ✅ Import project modules
+from dashboard_server.auth import router as auth_router
 from dashboard_server.database import SessionLocal, engine
 from dashboard_server.models import Base, Alert
 
-# Create database tables if not already present
+# ✅ Initialize database
 Base.metadata.create_all(bind=engine)
 
-# Initialize the FastAPI app
-app = FastAPI(title="AI Camera Cloud Server")
+# ✅ Create FastAPI app
+app = FastAPI(title="AI Camera Cloud", version="1.0")
 
-# Enable CORS (important for local -> cloud communication)
+# ✅ Allow requests from detector and frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # You can restrict to your local IP if needed
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Jinja2 templates (for web dashboard)
+# ✅ Include auth routes
+app.include_router(auth_router)
+
+# ✅ Setup templates and static folders
 templates = Jinja2Templates(directory="dashboard_server/templates")
-
-# Dependency: get DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+app.mount("/static", StaticFiles(directory="dashboard_server/static"), name="static")
 
 
-# ✅ Root route — for Render health checks
-@app.get("/", response_class=HTMLResponse)
-def home():
-    return """
-    <html>
-        <head><title>AI Camera Cloud</title></head>
-        <body style='font-family: Arial, sans-serif; text-align:center; margin-top:50px;'>
-            <h1>🚀 AI Camera Cloud Backend is Running!</h1>
-            <p><a href="/dashboard">📊 View Dashboard</a></p>
-            <p><a href="/api/alerts">🔗 API Endpoint</a></p>
-        </body>
-    </html>
-    """
+# ============================================================
+# ✅ API ROUTES
+# ============================================================
 
-
-# ✅ API endpoint — receive alerts from your detector
 @app.post("/api/alerts")
-async def receive_alert(request: Request, db: Session = Depends(get_db)):
+async def receive_alert(
+    camera_name: str = Form(...),
+    timestamp: str = Form(...),
+    snapshot: UploadFile = File(None),
+    db: Session = Depends(SessionLocal)
+):
     """
-    Receives alerts from AI detector via POST request.
-    Expected JSON body:
-    {
-        "camera_name": "Front_Yard",
-        "timestamp": "13:25:44"
-    }
+    Receive alerts from the AI detector (camera_name, timestamp, optional snapshot)
+    and store them in the database + static folder.
     """
     try:
-        data = await request.json()
-        camera_name = data.get("camera_name")
-        timestamp_str = data.get("timestamp")
+        # Convert timestamp string (HH:MM:SS) → datetime (today's date)
+        now = datetime.now()
+        timestamp_dt = datetime.combine(now.date(), datetime.strptime(timestamp, "%H:%M:%S").time())
 
-        # Validate camera name
-        if not camera_name:
-            return {"error": "Missing camera_name"}
+        # Save snapshot image if provided
+        snapshot_filename = None
+        if snapshot:
+            folder = "dashboard_server/static/snapshots"
+            os.makedirs(folder, exist_ok=True)
+            snapshot_filename = f"{camera_name}_{int(datetime.now().timestamp())}.jpg"
+            snapshot_path = os.path.join(folder, snapshot_filename)
 
-        # Convert timestamp string to datetime
-        try:
-            # Parses format like "13:25:44"
-            timestamp = datetime.strptime(timestamp_str, "%H:%M:%S")
-            # Set today’s date for full datetime
-            timestamp = timestamp.replace(
-                year=datetime.now().year,
-                month=datetime.now().month,
-                day=datetime.now().day,
-            )
-        except Exception:
-            timestamp = datetime.utcnow()
+            with open(snapshot_path, "wb") as f:
+                f.write(await snapshot.read())
 
-        # Create a new alert record
+        # Create alert record
         new_alert = Alert(
             camera_name=camera_name,
-            message="Person detected",
-            timestamp=timestamp
+            timestamp=timestamp_dt,
+            message=f"Person detected at {timestamp}",
         )
         db.add(new_alert)
         db.commit()
         db.refresh(new_alert)
 
-        print(f"[SERVER] ✅ Alert received: {camera_name} @ {timestamp}")
-
-        return {"status": "success", "camera_name": camera_name, "timestamp": timestamp.isoformat()}
+        print(f"[SERVER] ✅ Alert saved from {camera_name} at {timestamp}")
+        return {
+            "status": "success",
+            "id": new_alert.id,
+            "camera_name": camera_name,
+            "timestamp": timestamp,
+            "snapshot": snapshot_filename
+        }
 
     except Exception as e:
-        print(f"[SERVER ERROR] {e}")
-        return {"error": str(e)}
+        print(f"[SERVER ERROR] ❌ {str(e)}")
+        return {"status": "error", "message": str(e)}
 
 
-# ✅ Dashboard — shows all saved alerts
-@app.get("/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request, db: Session = Depends(get_db)):
-    alerts = db.query(Alert).order_by(Alert.timestamp.desc()).all()
-    return templates.TemplateResponse(
-        "alerts.html",
-        {"request": request, "alerts": alerts}
-    )
-
-
-# ✅ View all alerts as JSON (for debugging)
 @app.get("/api/alerts")
-def get_alerts(db: Session = Depends(get_db)):
-    alerts = db.query(Alert).order_by(Alert.timestamp.desc()).all()
-    return [
-        {
-            "id": a.id,
-            "camera_name": a.camera_name,
-            "message": a.message,
-            "timestamp": a.timestamp.isoformat()
-        }
-        for a in alerts
-    ]
+def get_alerts(db: Session = Depends(SessionLocal)):
+    """
+    Fetch all saved alerts as JSON.
+    """
+    alerts = db.query(Alert).order_by(Alert.id.desc()).all()
+    return alerts
+
+
+# ============================================================
+# ✅ DASHBOARD ROUTE
+# ============================================================
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request, db: Session = Depends(SessionLocal)):
+    """
+    Display recent alerts on a web dashboard.
+    """
+    alerts = db.query(Alert).order_by(Alert.id.desc()).limit(100).all()
+    return templates.TemplateResponse("alerts.html", {"request": request, "alerts": alerts})
+
+
+# ============================================================
+# ✅ ROOT ENDPOINT
+# ============================================================
+
+@app.get("/")
+def root():
+    """
+    Simple API root endpoint.
+    """
+    return {"message": "✅ AI Camera Cloud Server is Live", "status": "online"}
+
+
+# ============================================================
+# ✅ SERVER LOGGING HELPERS
+# ============================================================
+
+@app.on_event("startup")
+def on_startup():
+    print("🚀 AI Camera Cloud server started successfully on Render.")
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    print("🛑 Server shutting down.")
 
