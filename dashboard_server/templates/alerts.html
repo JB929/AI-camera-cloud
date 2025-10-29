@@ -1,95 +1,35 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8">
-  <title>AI Camera Alerts Dashboard</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #0d1117;
-      color: #e6edf3;
-      margin: 0;
-      padding: 0;
-    }
-    h1 {
-      text-align: center;
-      margin-top: 20px;
-      color: #58a6ff;
-    }
-    table {
-      width: 90%;
-      margin: 20px auto;
-      border-collapse: collapse;
-      background-color: #161b22;
-      border-radius: 10px;
-      overflow: hidden;
-    }
-    th, td {
-      padding: 12px 16px;
-      border-bottom: 1px solid #30363d;
-      text-align: center;
-    }
-    th {
-      background-color: #21262d;
-      color: #58a6ff;
-    }
-    tr:hover {
-      background-color: #1f6feb33;
-    }
-    img {
-      width: 120px;
-      border-radius: 8px;
-    }
-    .timestamp {
-      color: #8b949e;
-      font-size: 0.9em;
-    }
-    footer {
-      text-align: center;
-      color: #8b949e;
-      margin-top: 40px;
-      font-size: 0.9em;
-    }
-  </style>
-  <script>
-    // Auto-refresh every 10 seconds
-    setTimeout(() => window.location.reload(), 10000);
-  </script>
+  <title>AI Camera Alerts</title>
+  <meta http-equiv="refresh" content="5"> <!-- auto-refresh every 5 sec -->
+  <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <h1>📸 AI Camera Alert Logs</h1>
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Camera Name</th>
-        <th>Timestamp</th>
-        <th>Snapshot</th>
-        <th>Message</th>
-      </tr>
-    </thead>
-    <tbody>
+  <h1>📸 Recent Camera Alerts</h1>
+
+  {% if alerts %}
+    <div class="alerts-grid">
       {% for alert in alerts %}
-      <tr>
-        <td>{{ alert.id }}</td>
-        <td>{{ alert.camera_name }}</td>
-        <td class="timestamp">{{ alert.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</td>
-        <td>
-          {% set snapshot_path = '/static/snapshots/' + alert.camera_name + '_' + alert.timestamp.strftime('%s') + '.jpg' %}
-          {% if snapshot_path %}
-          <img src="{{ snapshot_path }}" alt="Snapshot">
-          {% else %}
-          <em>No image</em>
-          {% endif %}
-        </td>
-        <td>{{ alert.message }}</td>
-      </tr>
+        <div class="alert-card">
+          <p><strong>Camera:</strong> {{ alert.camera_name }}</p>
+          <p><strong>Time:</strong> {{ alert.timestamp }}</p>
+          <p>{{ alert.message }}</p>
+
+          {% set snapshot_path = '/static/snapshots/' + alert.camera_name + '_' %}
+          {% for file in os.listdir('dashboard_server/static/snapshots') %}
+            {% if file.startswith(alert.camera_name) %}
+              <img src="/static/snapshots/{{ file }}" alt="Snapshot" width="300">
+              {% break %}
+            {% endif %}
+          {% endfor %}
+        </div>
       {% endfor %}
-    </tbody>
-  </table>
-  <footer>
-    Auto-refreshing every 10s | <a href="/api/alerts" style="color:#58a6ff;">API View</a>
-  </footer>
+    </div>
+  {% else %}
+    <p>No alerts yet.</p>
+  {% endif %}
 </body>
 </html>
 

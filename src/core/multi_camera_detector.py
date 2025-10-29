@@ -15,7 +15,7 @@ CLOUD_URL = "https://ai-camera-cloud.onrender.com/api/alerts"
 
 
 # ✅ Send alert to cloud
-def send_alert_to_cloud(camera_name):
+def send_alert_to_cloud(camera_name,frame):
     """Send a person detection alert to the cloud dashboard"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     data = {

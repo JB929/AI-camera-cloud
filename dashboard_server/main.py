@@ -60,25 +60,44 @@ async def create_alert(
     camera_name: str = Form(...),
     timestamp: str = Form(...),
     message: str = Form(None),
+    snapshot: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
     """
-    Accepts alerts from local camera detector and stores them in the SQLite database.
+    Accepts alerts (and optional image snapshot) from local camera detector.
+    Stores them in the database and saves the snapshot to /static/snapshots.
     """
     try:
-        # Parse timestamp string into Python datetime
         from datetime import datetime
         ts = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
 
+        # ✅ Handle snapshot file upload
+        snapshot_filename = None
+        if snapshot:
+            snapshots_dir = "dashboard_server/static/snapshots"
+            os.makedirs(snapshots_dir, exist_ok=True)
+            snapshot_filename = f"{camera_name}_{int(datetime.now().timestamp())}.jpg"
+            file_path = os.path.join(snapshots_dir, snapshot_filename)
+            with open(file_path, "wb") as f:
+                f.write(await snapshot.read())
+
+        # ✅ Save alert entry to DB
         alert = Alert(
             camera_name=camera_name,
             timestamp=ts,
-            message=message or f"Alert from {camera_name} at {timestamp}"
+            message=message or f"Alert from {camera_name} at {timestamp}",
         )
         db.add(alert)
         db.commit()
         db.refresh(alert)
-        return {"status": "ok", "id": alert.id}
+
+        # ✅ Return snapshot path (if any)
+        return {
+            "status": "ok",
+            "id": alert.id,
+            "snapshot_url": f"/static/snapshots/{snapshot_filename}" if snapshot_filename else None
+        }
+
     except Exception as e:
         return {"status": "error", "detail": str(e)}
 
