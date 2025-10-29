@@ -59,7 +59,7 @@ from fastapi import Form
 @app.post("/api/alerts")
 async def create_alert(
     camera_name: str = Form(None),
-    timestamp: str
+    timestamp: str)
 
 
 # ✅ Health check
