@@ -53,24 +53,39 @@ async def get_alerts(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("alerts.html", {"request": request, "alerts": alerts})
 
 # ✅ Receive alerts from camera (cloud endpoint)
+from datetime import datetime
+
 @app.post("/api/alerts")
 def create_alert(
     camera_name: str = Form(...),
     timestamp: str = Form(...),
     message: str = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(SessionLocal)
 ):
     """
     Accepts alerts from local camera detector.
-    Stores them in the SQLite database.
+    Converts timestamp string → datetime for database compatibility.
     """
     try:
-        alert = Alert(camera_name=camera_name, timestamp=timestamp, message=message)
+        # ✅ Convert timestamp string to datetime object
+        try:
+            ts = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            ts = datetime.now()  # fallback if format mismatch
+
+        # ✅ Create and save alert
+        alert = Alert(
+            camera_name=camera_name,
+            timestamp=ts,
+            message=message,
+            user_id=None  # for now, no auth binding
+        )
         db.add(alert)
         db.commit()
         db.refresh(alert)
-        print(f"✅ Alert saved from {camera_name} at {timestamp}")
+        print(f"✅ Alert saved: {camera_name} @ {ts}")
         return {"status": "ok", "id": alert.id}
+
     except Exception as e:
         print(f"❌ Error saving alert: {e}")
         return {"status": "error", "detail": str(e)}
