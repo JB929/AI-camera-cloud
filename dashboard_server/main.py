@@ -62,13 +62,18 @@ def create_alert(
     message: str = Form(None),
     db: Session = Depends(SessionLocal)
 ):
-    alert = Alert(camera_name=camera_name, timestamp=timestamp, message=message)
-    db.add(alert)
-    db.commit()
-    db.refresh(alert)
-    return {"status": "ok", "id": alert.id}
-
-
+    """
+    Accepts alerts from local camera detector.
+    Stores them in the SQLite database.
+    """
+    try:
+        alert = Alert(camera_name=camera_name, timestamp=timestamp, message=message)
+        db.add(alert)
+        db.commit()
+        db.refresh(alert)
+        return {"status": "ok", "id": alert.id}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
 
 # ✅ Health check route
 @app.get("/health")
