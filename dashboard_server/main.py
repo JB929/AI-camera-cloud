@@ -56,38 +56,18 @@ async def get_alerts(request: Request, db: Session = Depends(get_db)):
 
 # ✅ Receive alerts from camera (cloud endpoint)
 @app.post("/api/alerts")
-async def receive_alert(request: Request, db: Session = Depends(get_db)):
-    """
-    Accepts both JSON or FormData alert payloads from camera app.
-    """
-    try:
-        # Try JSON first
-        data = await request.json()
-        camera_name = data.get("camera_name")
-        timestamp_str = data.get("timestamp")
-
-    except Exception:
-        # Fallback to form data
-        form = await request.form()
-        camera_name = form.get("camera_name")
-        timestamp_str = form.get("timestamp")
-
-    # ✅ Parse timestamp into datetime
-    try:
-        timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-    except Exception:
-        timestamp = datetime.utcnow()
-
-    # ✅ Store alert in database
-    new_alert = Alert(
-        message=f"Person detected on {camera_name}",
-        timestamp=timestamp,
-        camera_name=camera_name,
-    )
-    db.add(new_alert)
+def create_alert(
+    camera_name: str = Form(...),
+    timestamp: str = Form(...),
+    message: str = Form(None),
+    db: Session = Depends(SessionLocal)
+):
+    alert = Alert(camera_name=camera_name, timestamp=timestamp, message=message)
+    db.add(alert)
     db.commit()
+    db.refresh(alert)
+    return {"status": "ok", "id": alert.id}
 
-    return JSONResponse({"status": "success", "camera": camera_name})
 
 
 # ✅ Health check route
