@@ -1,25 +1,23 @@
-# dashboard_server/database.py
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# Using a simple SQLite DB — Render will create this file automatically
-DATABASE_URL = "sqlite:///./dashboard.db"
+# ✅ Always use an absolute path — works on both local and Render
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "dashboard.db")
 
-engine = create_engine(
-    DATABASE_URL, connect_args={"check_same_thread": False}
-)
+DATABASE_URL = f"sqlite:///{DB_PATH}"
 
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-
-# ✅ Initialize the DB — used in main.py
+# ✅ Initialize the database (used in main.py)
 def init_db():
     import dashboard_server.models  # make sure models are imported
     Base.metadata.create_all(bind=engine)
 
-
-# ✅ This is what auth.py was missing
+# ✅ Database session dependency (for routes)
 def get_session():
     db = SessionLocal()
     try:
