@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Form, File, UploadFile, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -9,15 +9,15 @@ import os
 
 from dashboard_server.database import SessionLocal, engine
 from dashboard_server.models import Base, Alert
-from dashboard_server.auth import router as auth_router
+from dashboard_server.auth import router as auth_router, get_current_user
 
 # ✅ Initialize database
 Base.metadata.create_all(bind=engine)
 
 # ✅ FastAPI app initialization
-app = FastAPI(title="AI Camera Cloud", version="2.2")
+app = FastAPI(title="AI Camera Cloud", version="2.1")
 
-# ✅ Enable CORS (for both dashboard and camera API)
+# ✅ Enable CORS for API and dashboard access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,14 +26,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ Mount static and templates
+# ✅ Static and templates setup
 templates = Jinja2Templates(directory="dashboard_server/templates")
 app.mount("/static", StaticFiles(directory="dashboard_server/static"), name="static")
 
-# ✅ Include authentication routes
+# ✅ Include auth router
 app.include_router(auth_router)
 
-# ✅ Database session dependency
+# ✅ Database dependency
 def get_db():
     db = SessionLocal()
     try:
@@ -46,13 +46,13 @@ def get_db():
 async def home(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
-# ✅ Show alerts dashboard
+# ✅ Show all alerts
 @app.get("/api/alerts", response_class=HTMLResponse)
 async def get_alerts(request: Request, db: Session = Depends(get_db)):
     alerts = db.query(Alert).order_by(Alert.timestamp.desc()).all()
     return templates.TemplateResponse("alerts.html", {"request": request, "alerts": alerts})
 
-# ✅ Receive alerts from camera (Form data)
+# ✅ Receive alerts from camera (cloud endpoint)
 @app.post("/api/alerts")
 def create_alert(
     camera_name: str = Form(...),
@@ -61,17 +61,22 @@ def create_alert(
     db: Session = Depends(get_db)
 ):
     """
-    Receives alerts from local AI camera systems (via POST).
-    Saves to the database and confirms success.
+    Accepts alerts from local camera detector.
+    Stores them in the SQLite database.
     """
     try:
         alert = Alert(camera_name=camera_name, timestamp=timestamp, message=message)
         db.add(alert)
         db.commit()
         db.refresh(alert)
-        print(f"✅ Alert saved: {camera_name} at {timestamp}")
+        print(f"✅ Alert saved from {camera_name} at {timestamp}")
         return {"status": "ok", "id": alert.id}
     except Exception as e:
         print(f"❌ Error saving alert: {e}")
         return {"status": "error", "detail": str(e)}
+
+# ✅ Health check route
+@app.get("/health")
+def health():
+    return {"status": "Server running", "version": "2.1"}
 
