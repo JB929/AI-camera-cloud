@@ -25,3 +25,20 @@ config.json
 *.secret
 *.token
 
+# Ignore Python virtual environments
+venv/
+.venv/
+env/
+*_env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+
+# Ignore local build or IDE stuff
+build/
+dist/
+.idea/
+.vscode/
+
