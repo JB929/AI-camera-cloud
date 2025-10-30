@@ -1,35 +1,48 @@
-<!DOCTYPE html>
-<html>
+k<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>AI Camera Alerts</title>
-  <meta http-equiv="refresh" content="5"> <!-- auto-refresh every 5 sec -->
-  <link rel="stylesheet" href="/static/style.css">
+    <meta charset="UTF-8">
+    <title>AI Camera Alerts</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #0d1117; color: #fff; margin: 0; padding: 20px; }
+        h1 { color: #00b7ff; }
+        .alert-card {
+            background: #161b22;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #00b7ff;
+            border-radius: 6px;
+        }
+        img {
+            width: 300px;
+            height: auto;
+            margin-top: 10px;
+            border-radius: 6px;
+            border: 1px solid #333;
+        }
+    </style>
 </head>
 <body>
-  <h1>📸 Recent Camera Alerts</h1>
+    <h1>📸 Recent AI Camera Alerts</h1>
 
-  {% if alerts %}
-    <div class="alerts-grid">
-      {% for alert in alerts %}
+    {% if alerts %}
+        {% for alert in alerts %}
         <div class="alert-card">
-          <p><strong>Camera:</strong> {{ alert.camera_name }}</p>
-          <p><strong>Time:</strong> {{ alert.timestamp }}</p>
-          <p>{{ alert.message }}</p>
+            <strong>Camera:</strong> {{ alert.camera_name }}<br>
+            <strong>Time:</strong> {{ alert.timestamp }}<br>
+            <strong>Message:</strong> {{ alert.message or "No message" }}<br>
 
-          {% set snapshot_path = '/static/snapshots/' + alert.camera_name + '_' %}
-          {% for file in os.listdir('dashboard_server/static/snapshots') %}
-            {% if file.startswith(alert.camera_name) %}
-              <img src="/static/snapshots/{{ file }}" alt="Snapshot" width="300">
-              {% break %}
-            {% endif %}
-          {% endfor %}
+            {% set snapshot_file = "/static/snapshots/" + alert.camera_name + "_" %}
+            {% for ext in [".jpg", ".png", ".jpeg"] %}
+                {% if loop.index == 1 %}
+                    <img src="{{ snapshot_file ~ ext }}" alt="snapshot" onerror="this.style.display='none';">
+                {% endif %}
+            {% endfor %}
         </div>
-      {% endfor %}
-    </div>
-  {% else %}
-    <p>No alerts yet.</p>
-  {% endif %}
+        {% endfor %}
+    {% else %}
+        <p>No alerts yet.</p>
+    {% endif %}
 </body>
 </html>
 

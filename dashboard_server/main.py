@@ -1,22 +1,22 @@
 from fastapi import FastAPI, Form, File, UploadFile, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
-from datetime import datetime 
+from datetime import datetime
 import os
 from dashboard_server.database import SessionLocal, engine
 from dashboard_server.models import Base, Alert
-from dashboard_server.auth import router as auth_router
+from dashboard_server.auth import router as auth_router, get_current_user
 
 # ✅ Initialize database
 Base.metadata.create_all(bind=engine)
 
-# ✅ FastAPI app initialization
-app = FastAPI(title="AI Camera Cloud", version="2.2")
+# ✅ FastAPI app
+app = FastAPI(title="AI Camera Cloud", version="2.5")
 
-# ✅ Enable CORS
+# ✅ CORS setup
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,14 +25,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ Templates & Static
+# ✅ Templates and static files
 templates = Jinja2Templates(directory="dashboard_server/templates")
 app.mount("/static", StaticFiles(directory="dashboard_server/static"), name="static")
 
-# ✅ Include Auth Router
+# ✅ Include authentication routes
 app.include_router(auth_router)
 
-# ✅ Database dependency
+
+# ✅ Database session dependency
 def get_db():
     db = SessionLocal()
     try:
@@ -47,57 +48,51 @@ async def home(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
 
-# ✅ Alerts list page
+# ✅ List all alerts with snapshot preview
 @app.get("/api/alerts", response_class=HTMLResponse)
 async def get_alerts(request: Request, db: Session = Depends(get_db)):
     alerts = db.query(Alert).order_by(Alert.timestamp.desc()).all()
     return templates.TemplateResponse("alerts.html", {"request": request, "alerts": alerts})
 
-# ✅ Receive alerts from camera (cloud endpoint)
-from fastapi import Form
 
+# ✅ Endpoint to receive alerts + image upload from cameras
 @app.post("/api/alerts")
 async def create_alert(
     camera_name: str = Form(...),
     timestamp: str = Form(...),
     message: str = Form(None),
     snapshot: UploadFile = File(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(SessionLocal)
 ):
-    """
-    Accepts alerts (and optional image snapshot) from local camera detector.
-    Stores them in the database and saves the snapshot to /static/snapshots.
-    """
     try:
-        from datetime import datetime
-        ts = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+        snapshot_path = None
 
-        # ✅ Handle snapshot file upload
-        snapshot_filename = None
+        # ✅ Save uploaded snapshot
         if snapshot:
-            snapshots_dir = "dashboard_server/static/snapshots"
-            os.makedirs(snapshots_dir, exist_ok=True)
-            snapshot_filename = f"{camera_name}_{int(datetime.now().timestamp())}.jpg"
-            file_path = os.path.join(snapshots_dir, snapshot_filename)
-            with open(file_path, "wb") as f:
+            os.makedirs("dashboard_server/static/snapshots", exist_ok=True)
+            file_ext = os.path.splitext(snapshot.filename)[1]
+            filename = f"{camera_name}_{int(datetime.now().timestamp())}{file_ext}"
+            snapshot_path = f"dashboard_server/static/snapshots/{filename}"
+            with open(snapshot_path, "wb") as f:
                 f.write(await snapshot.read())
 
-        # ✅ Save alert entry to DB
+        # ✅ Convert timestamp correctly
+        ts_obj = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+
+        # ✅ Create new alert entry
         alert = Alert(
             camera_name=camera_name,
-            timestamp=ts,
-            message=message or f"Alert from {camera_name} at {timestamp}",
+            timestamp=ts_obj,
+            message=message,
         )
         db.add(alert)
         db.commit()
         db.refresh(alert)
 
-        # ✅ Return snapshot path (if any)
-        return {
-            "status": "ok",
-            "id": alert.id,
-            "snapshot_url": f"/static/snapshots/{snapshot_filename}" if snapshot_filename else None
-        }
+        # ✅ Return public snapshot URL
+        snapshot_url = f"/static/snapshots/{os.path.basename(snapshot_path)}" if snapshot_path else None
+
+        return {"status": "ok", "id": alert.id, "snapshot_url": snapshot_url}
 
     except Exception as e:
         return {"status": "error", "detail": str(e)}
@@ -106,5 +101,5 @@ async def create_alert(
 # ✅ Health check
 @app.get("/health")
 def health():
-    return {"status": "running", "version": "2.2"}
+    return {"status": "Server running", "version": "2.5"}
 
