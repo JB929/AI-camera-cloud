@@ -7,7 +7,6 @@ from jose import jwt, JWTError
 
 # ✅ Correct import path (Render-safe)
 from dashboard_server.database import get_session, init_db
-from dashboard_server.models import User
 
 router = APIRouter()
 SECRET_KEY = "supersecretkey"  # You can store in Render Environment variables later
@@ -38,8 +37,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 
 @router.post("/token")
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_session)):
-    user = db.query(User).filter(User.username == form_data.username).first()
+def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_session)
     if not user or not verify_password(form_data.password, user.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
@@ -62,7 +60,6 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     except JWTError:
         raise credentials_exception
 
-    user = db.query(User).filter(User.username == username).first()
     if user is None:
         raise credentials_exception
     return user
