@@ -15,6 +15,7 @@ Base.metadata.create_all(bind=engine)
 
 # ✅ FastAPI app
 app = FastAPI(title="AI Camera Cloud", version="2.5")
+print("✅ Loaded main.py from:", __file__)
 
 # ✅ CORS setup
 app.add_middleware(
