@@ -75,8 +75,48 @@ async def create_alert(
     timestamp: str = Form(...),
     message: str = Form(None),
     snapshot: UploadFile = File(None),
-    db: Session = Depends(SessionLocal)
+    db: Session = Depends(get_db)
 ):
+    """
+    Accepts alerts from local camera detector and saves to database.
+    """
+    try:
+        # 🕒 Ensure timestamp stored as a datetime object
+        from datetime import datetime
+        ts = datetime.fromisoformat(timestamp) if " " in timestamp else datetime.utcnow()
+
+        # 💾 Save snapshot file (if provided)
+        snapshot_url = None
+        if snapshot:
+            folder = "dashboard_server/static/snapshots"
+            os.makedirs(folder, exist_ok=True)
+            filename = f"{camera_name}_{int(datetime.utcnow().timestamp())}.jpg"
+            filepath = os.path.join(folder, filename)
+            with open(filepath, "wb") as f:
+                f.write(await snapshot.read())
+            snapshot_url = f"/static/snapshots/{filename}"
+
+        # 🧠 Create alert entry
+        alert = Alert(
+            camera_name=camera_name,
+            timestamp=ts,
+            message=message,
+        )
+        db.add(alert)
+        db.commit()
+        db.refresh(alert)
+
+        return {
+            "status": "ok",
+            "id": alert.id,
+            "snapshot_url": snapshot_url
+        }
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "detail": str(e)}
+
 
     try:
         snapshot_url = None
