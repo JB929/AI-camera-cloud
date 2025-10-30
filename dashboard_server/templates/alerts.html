@@ -1,48 +1,67 @@
-k<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>AI Camera Alerts</title>
+    <meta http-equiv="refresh" content="10"> <!-- Auto-refresh every 10 seconds -->
+    <link rel="stylesheet" href="/static/style.css">
     <style>
-        body { font-family: Arial, sans-serif; background: #0d1117; color: #fff; margin: 0; padding: 20px; }
-        h1 { color: #00b7ff; }
+        body {
+            background: #0b0c10;
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            text-align: center;
+        }
+        h1 {
+            color: #66fcf1;
+        }
+        .alert-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 20px;
+        }
         .alert-card {
-            background: #161b22;
-            padding: 15px;
-            margin: 15px 0;
-            border-left: 4px solid #00b7ff;
-            border-radius: 6px;
+            background: #1f2833;
+            padding: 16px;
+            border-radius: 10px;
+            width: 300px;
+            box-shadow: 0 0 10px rgba(102,252,241,0.2);
         }
         img {
-            width: 300px;
-            height: auto;
+            width: 100%;
+            border-radius: 8px;
             margin-top: 10px;
-            border-radius: 6px;
-            border: 1px solid #333;
+        }
+        .timestamp {
+            color: #aaa;
+            font-size: 0.9em;
+        }
+        .camera {
+            color: #45a29e;
+            font-weight: 600;
         }
     </style>
 </head>
 <body>
-    <h1>📸 Recent AI Camera Alerts</h1>
+    <h1>📸 Live Camera Alerts</h1>
+    <p>Auto-refreshing every 10 seconds...</p>
 
-    {% if alerts %}
+    <div class="alert-grid">
         {% for alert in alerts %}
         <div class="alert-card">
-            <strong>Camera:</strong> {{ alert.camera_name }}<br>
-            <strong>Time:</strong> {{ alert.timestamp }}<br>
-            <strong>Message:</strong> {{ alert.message or "No message" }}<br>
-
-            {% set snapshot_file = "/static/snapshots/" + alert.camera_name + "_" %}
-            {% for ext in [".jpg", ".png", ".jpeg"] %}
-                {% if loop.index == 1 %}
-                    <img src="{{ snapshot_file ~ ext }}" alt="snapshot" onerror="this.style.display='none';">
-                {% endif %}
-            {% endfor %}
+            <p class="camera">{{ alert.camera_name }}</p>
+            <p class="timestamp">{{ alert.timestamp }}</p>
+            <p>{{ alert.message }}</p>
+            {% if alert.snapshot_path %}
+            <img src="{{ alert.snapshot_path }}" alt="Snapshot">
+            {% endif %}
         </div>
-        {% endfor %}
-    {% else %}
+        {% else %}
         <p>No alerts yet.</p>
-    {% endif %}
+        {% endfor %}
+    </div>
 </body>
 </html>
 

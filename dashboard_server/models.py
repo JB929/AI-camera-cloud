@@ -13,14 +13,17 @@ class User(Base):
     alerts = relationship("Alert", back_populates="user")
 
 
+from sqlalchemy import Column, Integer, String, DateTime
+from datetime import datetime
+from dashboard_server.database import Base
+
 class Alert(Base):
     __tablename__ = "alerts"
-
+    
     id = Column(Integer, primary_key=True, index=True)
-    camera_name = Column(String)
+    camera_name = Column(String, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
-    message = Column(String)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    message = Column(String, nullable=True)
+    snapshot_path = Column(String, nullable=True)
 
-    user = relationship("User", back_populates="alerts")
 

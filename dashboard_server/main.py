@@ -101,7 +101,8 @@ async def create_alert(
             camera_name=camera_name,
             timestamp=ts,
             message=message,
-        )
+            snapshot_path=snapshot_url
+)
         db.add(alert)
         db.commit()
         db.refresh(alert)
