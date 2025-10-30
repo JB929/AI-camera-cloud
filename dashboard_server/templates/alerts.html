@@ -2,66 +2,84 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>AI Camera Alerts</title>
+    <title>AI Camera Cloud – Live Alerts</title>
     <meta http-equiv="refresh" content="10"> <!-- Auto-refresh every 10 seconds -->
-    <link rel="stylesheet" href="/static/style.css">
     <style>
         body {
-            background: #0b0c10;
-            color: #fff;
-            font-family: 'Inter', sans-serif;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f4f4f9;
+            color: #333;
+            padding: 40px;
             text-align: center;
         }
         h1 {
-            color: #66fcf1;
+            color: #222;
+            margin-bottom: 20px;
         }
-        .alert-grid {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 16px;
-            margin-top: 20px;
-        }
-        .alert-card {
-            background: #1f2833;
-            padding: 16px;
+        table {
+            margin: auto;
+            border-collapse: collapse;
+            width: 90%;
+            background: white;
             border-radius: 10px;
-            width: 300px;
-            box-shadow: 0 0 10px rgba(102,252,241,0.2);
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+        }
+        th, td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background: #0078D7;
+            color: white;
+            text-transform: uppercase;
+        }
+        tr:hover {
+            background: #f1f1f1;
         }
         img {
-            width: 100%;
             border-radius: 8px;
-            margin-top: 10px;
+            max-height: 80px;
         }
         .timestamp {
-            color: #aaa;
+            color: #777;
             font-size: 0.9em;
-        }
-        .camera {
-            color: #45a29e;
-            font-weight: 600;
         }
     </style>
 </head>
 <body>
-    <h1>📸 Live Camera Alerts</h1>
-    <p>Auto-refreshing every 10 seconds...</p>
-
-    <div class="alert-grid">
-        {% for alert in alerts %}
-        <div class="alert-card">
-            <p class="camera">{{ alert.camera_name }}</p>
-            <p class="timestamp">{{ alert.timestamp }}</p>
-            <p>{{ alert.message }}</p>
-            {% if alert.snapshot_path %}
-            <img src="{{ alert.snapshot_path }}" alt="Snapshot">
-            {% endif %}
-        </div>
-        {% else %}
-        <p>No alerts yet.</p>
-        {% endfor %}
-    </div>
+    <h1>📸 AI Camera Live Alerts</h1>
+    {% if alerts %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Camera</th>
+                <th>Message</th>
+                <th>Snapshot</th>
+                <th>Timestamp</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for alert in alerts %}
+            <tr>
+                <td>{{ alert.id }}</td>
+                <td>{{ alert.camera_name }}</td>
+                <td>{{ alert.message }}</td>
+                <td>
+                    {% if alert.snapshot_path %}
+                        <img src="{{ alert.snapshot_path }}" alt="snapshot">
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td class="timestamp">{{ alert.timestamp }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p>No alerts yet...</p>
+    {% endif %}
 </body>
 </html>
 
