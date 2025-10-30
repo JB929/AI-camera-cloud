@@ -56,6 +56,18 @@ async def get_alerts(request: Request, db: Session = Depends(get_db)):
 
 
 # ✅ Endpoint to receive alerts + image upload from cameras
+# ✅ Receive alerts from camera (with optional snapshot)
+from fastapi import FastAPI, Form, File, UploadFile, Depends, Request
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
+from datetime import datetime
+import os
+from dashboard_server.database import SessionLocal
+from dashboard_server.models import Alert
+
+UPLOAD_DIR = "dashboard_server/static/snapshots"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
 @app.post("/api/alerts")
 async def create_alert(
     camera_name: str = Form(...),
@@ -64,38 +76,36 @@ async def create_alert(
     snapshot: UploadFile = File(None),
     db: Session = Depends(SessionLocal)
 ):
+    """
+    Receives alerts from AI camera detector or manual tests.
+    Stores in DB and saves optional snapshot image.
+    """
     try:
-        snapshot_path = None
-
-        # ✅ Save uploaded snapshot
+        snapshot_url = None
+        # Save snapshot if provided
         if snapshot:
-            os.makedirs("dashboard_server/static/snapshots", exist_ok=True)
-            file_ext = os.path.splitext(snapshot.filename)[1]
-            filename = f"{camera_name}_{int(datetime.now().timestamp())}{file_ext}"
-            snapshot_path = f"dashboard_server/static/snapshots/{filename}"
-            with open(snapshot_path, "wb") as f:
+            file_name = f"{camera_name}_{int(datetime.now().timestamp())}.jpg"
+            file_path = os.path.join(UPLOAD_DIR, file_name)
+            with open(file_path, "wb") as f:
                 f.write(await snapshot.read())
+            snapshot_url = f"/static/snapshots/{file_name}"
 
-        # ✅ Convert timestamp correctly
-        ts_obj = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+        # Parse timestamp
+        ts = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
 
-        # ✅ Create new alert entry
+        # Store alert in DB
         alert = Alert(
             camera_name=camera_name,
-            timestamp=ts_obj,
-            message=message,
+            timestamp=ts,
+            message=message or f"Alert from {camera_name} at {timestamp}"
         )
         db.add(alert)
         db.commit()
         db.refresh(alert)
 
-        # ✅ Return public snapshot URL
-        snapshot_url = f"/static/snapshots/{os.path.basename(snapshot_path)}" if snapshot_path else None
-
         return {"status": "ok", "id": alert.id, "snapshot_url": snapshot_url}
-
     except Exception as e:
-        return {"status": "error", "detail": str(e)}
+        return JSONResponse(content={"status": "error", "detail": str(e)}, status_code=500)
 
 
 # ✅ Health check
