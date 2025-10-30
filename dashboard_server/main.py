@@ -6,11 +6,11 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from datetime import datetime
 import os
-from dashboard_server.database import SessionLocal, engine, base base.metadata.create_all(bind=engine)
 from dashboard_server.models import Base, Alert
 from dashboard_server.auth import router as auth_router, get_current_user
+from dashboard_server.database import SessionLocal, engine, Base
 
-# ✅ Initialize database
+# ✅ Initialize database correctly
 Base.metadata.create_all(bind=engine)
 
 # ✅ FastAPI app
