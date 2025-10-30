@@ -4,7 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime 
+import os
 from dashboard_server.database import SessionLocal, engine
 from dashboard_server.models import Base, Alert
 from dashboard_server.auth import router as auth_router
