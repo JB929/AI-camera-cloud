@@ -76,24 +76,21 @@ async def create_alert(
     snapshot: UploadFile = File(None),
     db: Session = Depends(SessionLocal)
 ):
-    """
-    Receives alerts from AI camera detector or manual tests.
-    Stores in DB and saves optional snapshot image.
-    """
+
     try:
         snapshot_url = None
         # Save snapshot if provided
         if snapshot:
+            os.makedirs("dashboard_server/static/snapshots", exist_ok=True)
             file_name = f"{camera_name}_{int(datetime.now().timestamp())}.jpg"
             file_path = os.path.join(UPLOAD_DIR, file_name)
             with open(file_path, "wb") as f:
                 f.write(await snapshot.read())
             snapshot_url = f"/static/snapshots/{file_name}"
 
-        # Parse timestamp
+        
         ts = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
 
-        # Store alert in DB
         alert = Alert(
             camera_name=camera_name,
             timestamp=ts,
@@ -105,7 +102,7 @@ async def create_alert(
 
         return {"status": "ok", "id": alert.id, "snapshot_url": snapshot_url}
     except Exception as e:
-        return JSONResponse(content={"status": "error", "detail": str(e)}, status_code=500)
+        return {"status": "error", "detail": str(e)}
 
 
 # ✅ Health check
