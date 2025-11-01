@@ -2,99 +2,87 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>AI Camera Cloud – Live Alerts</title>
-    <meta http-equiv="refresh" content="10"> <!-- Auto-refresh every 10 seconds -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Camera Cloud – Alerts</title>
+    <link rel="stylesheet" href="/static/style.css">
     <style>
         body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: #f4f4f9;
-            color: #333;
-            padding: 40px;
-            text-align: center;
-        }
-        h1 {
-            color: #222;
-            margin-bottom: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #0a0a0a;
+            color: #eee;
+            margin: 0;
+            padding: 0;
         }
         table {
-            margin: auto;
+            width: 95%;
+            margin: 40px auto;
             border-collapse: collapse;
-            width: 90%;
-            background: white;
+            background: #1c1c1c;
             border-radius: 10px;
-            box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            box-shadow: 0 0 15px rgba(0,0,0,0.4);
         }
         th, td {
-            padding: 12px 16px;
-            border-bottom: 1px solid #eee;
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #333;
         }
         th {
-            background: #0078D7;
-            color: white;
+            background-color: #111;
+            color: #00e5ff;
             text-transform: uppercase;
         }
         tr:hover {
-            background: #f1f1f1;
+            background-color: #222;
         }
-        img {
-            border-radius: 8px;
-            max-height: 80px;
+        img.snapshot {
+            width: 120px;
+            height: auto;
+            border-radius: 6px;
+            transition: transform 0.2s;
         }
-        .timestamp {
-            color: #777;
-            font-size: 0.9em;
+        img.snapshot:hover {
+            transform: scale(1.2);
+        }
+        h1 {
+            text-align: center;
+            margin-top: 30px;
+            color: #00e5ff;
         }
     </style>
 </head>
 <body>
-    <h1>📸 AI Camera Live Alerts</h1>
-    {% if alerts %}
+    <h1>📸 Live Alert Log</h1>
     <table>
         <thead>
             <tr>
                 <th>ID</th>
                 <th>Camera</th>
+                <th>Timestamp</th>
                 <th>Message</th>
                 <th>Snapshot</th>
-                <th>Timestamp</th>
             </tr>
         </thead>
-<script>
-  const socket = new WebSocket("wss://" + window.location.host + "/ws/alerts");
-
-  socket.onmessage = function(event) {
-    const data = JSON.parse(event.data);
-    const alertsList = document.getElementById("alerts-list");
-    const item = document.createElement("li");
-    item.innerHTML = `
-      <b>${data.camera_name}</b> – ${data.message} 
-      <small>${data.timestamp}</small><br>
-      ${data.snapshot_url ? `<img src="${data.snapshot_url}" width="200">` : ""}
-    `;
-    alertsList.prepend(item);
-  };
-</script>
-        </body>
+        <tbody>
             {% for alert in alerts %}
             <tr>
                 <td>{{ alert.id }}</td>
                 <td>{{ alert.camera_name }}</td>
+                <td>{{ alert.timestamp }}</td>
                 <td>{{ alert.message }}</td>
                 <td>
-                    {% if alert.snapshot_path %}
-                        <img src="{{ alert.snapshot_path }}" alt="snapshot">
+                    {% if alert.snapshot_url %}
+                        <a href="{{ alert.snapshot_url }}" target="_blank">
+                            <img src="{{ alert.snapshot_url }}" class="snapshot" alt="Snapshot">
+                        </a>
                     {% else %}
-                        —
+                        -
                     {% endif %}
                 </td>
-                <td class="timestamp">{{ alert.timestamp }}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
-    {% else %}
-        <p>No alerts yet...</p>
-    {% endif %}
 </body>
 </html>
 
