@@ -12,6 +12,14 @@ from dashboard_server.database import SessionLocal, engine, Base
 from fastapi.responses import StreamingResponse
 import cv2
 Base.metadata.create_all(bind=engine)
+# ✅ Ensure the database and tables are created on every startup
+from dashboard_server.database import Base, engine
+from dashboard_server.models import Alert
+
+print("🧠 Checking and creating database tables if needed...")
+Base.metadata.create_all(bind=engine)
+print("✅ Database tables verified/created successfully.")
+
 # --- TEMPORARY: Force rebuild database on startup ---
 from dashboard_server.models import Alert
 from dashboard_server.database import engine, Base
