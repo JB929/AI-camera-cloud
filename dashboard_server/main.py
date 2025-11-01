@@ -122,46 +122,46 @@ async def create_alert(
     db: Session = Depends(get_db)
 ):
     """
-    Receives alerts from local camera detector and stores them in the database
-    (with optional snapshot upload).
+    Accepts alerts from local camera detector and saves them to the SQLite DB.
     """
-    from datetime import datetime
-    import traceback, os
-
     try:
-        # ✅ Ensure valid datetime
+        from datetime import datetime
+
+        # Parse timestamp safely
         try:
             ts = datetime.fromisoformat(timestamp)
         except Exception:
             ts = datetime.utcnow()
 
-        # ✅ Prepare snapshot saving
+        # 💾 Save snapshot file (if provided)
         snapshot_url = None
         if snapshot:
             folder = "dashboard_server/static/snapshots"
             os.makedirs(folder, exist_ok=True)
+
             filename = f"{camera_name}_{int(datetime.utcnow().timestamp())}.jpg"
             filepath = os.path.join(folder, filename)
 
-            # Write image to disk
             with open(filepath, "wb") as f:
                 f.write(await snapshot.read())
 
-            # Store relative web path
+            # ✅ This is what we’ll save in DB
             snapshot_url = f"/static/snapshots/{filename}"
 
-        # ✅ Create and save alert in DB
+        # 🧠 Create and save the alert entry
         alert = Alert(
             camera_name=camera_name,
             timestamp=ts,
-            message=message or f"Alert from {camera_name} at {timestamp}",
-            snapshot_url=snapshot_url  # <-- Correct field
+            message=message or f"Person detected by {camera_name} at {timestamp}",
+            snapshot_url=snapshot_url  # ✅ This line ensures snapshot is saved
         )
+
         db.add(alert)
         db.commit()
         db.refresh(alert)
 
-        # ✅ Return confirmation
+        print(f"✅ Alert saved: {camera_name}, snapshot={snapshot_url}")
+
         return {
             "status": "ok",
             "id": alert.id,
@@ -169,24 +169,10 @@ async def create_alert(
         }
 
     except Exception as e:
-        traceback.print_exc()
-        return {"status": "error", "detail": str(e)}
-
-
-        # ✅ Broadcast to connected dashboards
-        broadcast_alert({
-            "camera_name": alert.camera_name,
-            "timestamp": str(alert.timestamp),
-            "message": alert.message,
-            "snapshot_url": alert.snapshot_url
-        })
-
-        return {"status": "ok", "id": alert.id, "snapshot_url": snapshot_url}
-
-    except Exception as e:
         import traceback
         traceback.print_exc()
         return {"status": "error", "detail": str(e)}
+
 
 
 # ✅ Real-time alert broadcast (WebSocket)
