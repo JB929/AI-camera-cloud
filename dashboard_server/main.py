@@ -9,6 +9,11 @@ import os
 from dashboard_server.models import Base, Alert
 from dashboard_server.auth import router as auth_router, get_current_user
 from dashboard_server.database import SessionLocal, engine, Base
+from fastapi.responses import StreamingResponse
+import cv2
+
+# global dictionary to store frames per camera
+camera_frames = {}
 
 # ✅ Initialize database correctly
 Base.metadata.create_all(bind=engine)
@@ -50,25 +55,42 @@ async def home(request: Request):
 
 
 # ✅ List all alerts with snapshot preview
+@app.get("/api/latest_snapshots")
+async def latest_snapshots(db: Session = Depends(get_db)):
+    """Returns the latest alert per camera (for dashboard grid)."""
+    from sqlalchemy import func
+    subq = db.query(
+        Alert.camera_name,
+        func.max(Alert.timestamp).label("latest_time")
+    ).group_by(Alert.camera_name).subquery()
+
+    latest = db.query(Alert).join(
+        subq,
+        (Alert.camera_name == subq.c.camera_name) &
+        (Alert.timestamp == subq.c.latest_time)
+    ).all()
+
+    return [
+        {
+            "camera_name": a.camera_name,
+            "timestamp": str(a.timestamp),
+            "snapshot_url": a.snapshot_url,
+        }
+        for a in latest
+    ]
+
 @app.get("/api/alerts", response_class=HTMLResponse)
 async def get_alerts(request: Request, db: Session = Depends(get_db)):
     alerts = db.query(Alert).order_by(Alert.timestamp.desc()).all()
     return templates.TemplateResponse("alerts.html", {"request": request, "alerts": alerts})
 
 
-# ✅ Endpoint to receive alerts + image upload from cameras
-# ✅ Receive alerts from camera (with optional snapshot)
-from fastapi import FastAPI, Form, File, UploadFile, Depends, Request
-from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
-from datetime import datetime
-import os
-from dashboard_server.database import SessionLocal
-from dashboard_server.models import Alert
-
+# ✅ Directory for snapshots
 UPLOAD_DIR = "dashboard_server/static/snapshots"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
+# ✅ Endpoint to receive alerts + image upload from cameras
 @app.post("/api/alerts")
 async def create_alert(
     camera_name: str = Form(...),
@@ -81,37 +103,41 @@ async def create_alert(
     Accepts alerts from local camera detector and saves to database.
     """
     try:
-        # 🕒 Ensure timestamp stored as a datetime object
-        from datetime import datetime
-        ts = datetime.fromisoformat(timestamp) if " " in timestamp else datetime.utcnow()
+        # 🕒 Parse timestamp safely
+        try:
+            ts = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            ts = datetime.utcnow()
 
-        # 💾 Save snapshot file (if provided)
+        # 💾 Save snapshot if provided
         snapshot_url = None
         if snapshot:
-            folder = "dashboard_server/static/snapshots"
-            os.makedirs(folder, exist_ok=True)
-            filename = f"{camera_name}_{int(datetime.utcnow().timestamp())}.jpg"
-            filepath = os.path.join(folder, filename)
-            with open(filepath, "wb") as f:
+            file_name = f"{camera_name}_{int(datetime.utcnow().timestamp())}.jpg"
+            file_path = os.path.join(UPLOAD_DIR, file_name)
+            with open(file_path, "wb") as f:
                 f.write(await snapshot.read())
-            snapshot_url = f"/static/snapshots/{filename}"
+            snapshot_url = f"/static/snapshots/{file_name}"
 
-        # 🧠 Create alert entry
+        # 🧠 Create and store alert
         alert = Alert(
             camera_name=camera_name,
             timestamp=ts,
-            message=message,
-            snapshot_path=snapshot_url
-)
+            message=message or f"Alert from {camera_name} at {timestamp}",
+            snapshot_url=snapshot_url
+        )
         db.add(alert)
         db.commit()
         db.refresh(alert)
 
-        return {
-            "status": "ok",
-            "id": alert.id,
-            "snapshot_url": snapshot_url
-        }
+        # ✅ Broadcast to connected dashboards
+        broadcast_alert({
+            "camera_name": alert.camera_name,
+            "timestamp": str(alert.timestamp),
+            "message": alert.message,
+            "snapshot_url": alert.snapshot_url
+        })
+
+        return {"status": "ok", "id": alert.id, "snapshot_url": snapshot_url}
 
     except Exception as e:
         import traceback
@@ -119,36 +145,51 @@ async def create_alert(
         return {"status": "error", "detail": str(e)}
 
 
+# ✅ Real-time alert broadcast (WebSocket)
+from fastapi import WebSocket, WebSocketDisconnect
+from typing import List
+
+active_connections: List[WebSocket] = []
+
+
+@app.websocket("/ws/alerts")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    active_connections.append(websocket)
     try:
-        snapshot_url = None
-        # Save snapshot if provided
-        if snapshot:
-            os.makedirs("dashboard_server/static/snapshots", exist_ok=True)
-            file_name = f"{camera_name}_{int(datetime.now().timestamp())}.jpg"
-            file_path = os.path.join(UPLOAD_DIR, file_name)
-            with open(file_path, "wb") as f:
-                f.write(await snapshot.read())
-            snapshot_url = f"/static/snapshots/{file_name}"
+        while True:
+            await websocket.receive_text()  # keep connection alive
+    except WebSocketDisconnect:
+        active_connections.remove(websocket)
 
-        
-        ts = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
 
-        alert = Alert(
-            camera_name=camera_name,
-            timestamp=ts,
-            message=message or f"Alert from {camera_name} at {timestamp}"
-        )
-        db.add(alert)
-        db.commit()
-        db.refresh(alert)
-
-        return {"status": "ok", "id": alert.id, "snapshot_url": snapshot_url}
-    except Exception as e:
-        return {"status": "error", "detail": str(e)}
-
+def broadcast_alert(alert_data):
+    """Push new alerts to all connected dashboards."""
+    for connection in active_connections:
+        try:
+            connection.send_json(alert_data)
+        except Exception:
+            pass
 
 # ✅ Health check
 @app.get("/health")
 def health():
     return {"status": "Server running", "version": "2.5"}
+
+def generate_mjpeg(camera_name: str):
+    """Generator that yields camera frames as JPEG byte stream."""
+    while True:
+        if camera_name in camera_frames:
+            frame = camera_frames[camera_name]
+            ret, jpeg = cv2.imencode('.jpg', frame)
+            if ret:
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
+        time.sleep(0.05)
+
+@app.get("/video_feed/{camera_name}")
+def video_feed(camera_name: str):
+    """HTTP MJPEG feed endpoint."""
+    return StreamingResponse(generate_mjpeg(camera_name),
+                              media_type='multipart/x-mixed-replace; boundary=frame')
 

@@ -1,34 +1,79 @@
-<!-- templates/dashboard.html -->
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>AI Camera Dashboard</title>
-  <link rel="stylesheet" href="/static/css/style.css">
+<meta charset="UTF-8">
+<title>AI Camera Control Center</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    body { font-family: 'Segoe UI', sans-serif; margin:0; background:#0d1117; color:#f0f6fc; }
+    header { padding:20px; text-align:center; background:#161b22; border-bottom:1px solid #30363d; }
+    h1 { margin:0; font-size:1.8rem; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(340px,1fr)); gap:1rem; padding:20px; }
+    .camera-card { background:#161b22; border:1px solid #30363d; border-radius:10px; padding:10px; position:relative; overflow:hidden; }
+    .camera-card h3 { margin:0 0 4px 0; }
+    .snapshot-live { width:100%; border-radius:8px; }
+    .timestamp { font-size:0.8rem; color:#8b949e; }
+    .alert-badge { position:absolute; top:10px; right:10px; background:#ff4d4d; padding:4px 8px; border-radius:6px; font-size:0.75rem; }
+</style>
+<script>
+    // --- WebSocket for instant alerts ---
+    const socket = new WebSocket("wss://" + window.location.host + "/ws/alerts");
+
+    socket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        const card = document.getElementById(data.camera_name);
+        if (card) {
+            const img = card.querySelector("img");
+            if (data.snapshot_url) img.src = data.snapshot_url + "?t=" + new Date().getTime();
+            const badge = card.querySelector(".alert-badge");
+            badge.style.display = "block";
+            badge.textContent = "ALERT!";
+            setTimeout(()=> badge.style.display="none", 6000);
+            card.querySelector(".timestamp").innerText = data.timestamp;
+        } else {
+            addNewCameraCard(data);
+        }
+    };
+
+    // --- Auto refresh snapshots every 5 s ---
+    function refreshSnapshots(){
+        document.querySelectorAll(".snapshot-live").forEach(img=>{
+            img.src = img.src.split("?")[0] + "?t=" + new Date().getTime();
+        });
+    }
+    setInterval(refreshSnapshots,5000);
+
+    // --- Build camera cards dynamically ---
+    async function loadLatest(){
+        const res = await fetch("/api/latest_snapshots");
+        const cams = await res.json();
+        const grid = document.getElementById("camera-grid");
+        grid.innerHTML="";
+        cams.forEach(c=>addNewCameraCard(c));
+    }
+
+    function addNewCameraCard(c){
+        const grid = document.getElementById("camera-grid");
+        const div = document.createElement("div");
+        div.className="camera-card";
+        div.id=c.camera_name;
+        div.innerHTML = `
+            <div class="alert-badge" style="display:none;">ALERT!</div>
+            <h3>${c.camera_name}</h3>
+            <img src="${c.snapshot_url || '/static/placeholder.jpg'}" class="snapshot-live">
+            <div class="timestamp">${c.timestamp}</div>
+        `;
+        grid.appendChild(div);
+    }
+
+    window.onload = loadLatest;
+</script>
 </head>
 <body>
-  <header>
-    <h1>AI Camera Dashboard</h1>
-    <div class="nav">
-      <span id="userLabel"></span>
-      <a href="/logout">Logout</a>
-    </div>
-  </header>
-
-  <main>
-    <section id="cameras">
-      <!-- camera cards injected here -->
-    </section>
-
-    <aside id="alerts">
-      <h3>Recent alerts</h3>
-      <div id="alertsList"></div>
-    </aside>
-  </main>
-
-  <audio id="alarm" src="/static/audio/alert.mp3" preload="auto"></audio>
-
-  <script src="/static/js/dashboard.js"></script>
+<header>
+    <h1>AI Camera Monitoring Dashboard</h1>
+</header>
+<div class="grid" id="camera-grid"></div>
 </body>
 </html>
 

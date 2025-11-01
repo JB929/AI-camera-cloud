@@ -59,7 +59,22 @@
                 <th>Timestamp</th>
             </tr>
         </thead>
-        <tbody>
+<script>
+  const socket = new WebSocket("wss://" + window.location.host + "/ws/alerts");
+
+  socket.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    const alertsList = document.getElementById("alerts-list");
+    const item = document.createElement("li");
+    item.innerHTML = `
+      <b>${data.camera_name}</b> – ${data.message} 
+      <small>${data.timestamp}</small><br>
+      ${data.snapshot_url ? `<img src="${data.snapshot_url}" width="200">` : ""}
+    `;
+    alertsList.prepend(item);
+  };
+</script>
+        </body>
             {% for alert in alerts %}
             <tr>
                 <td>{{ alert.id }}</td>
