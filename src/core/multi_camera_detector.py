@@ -8,7 +8,7 @@ import os
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 import requests
-from dashboard_server.main import camera_frames
+camera_frames = {}
 
 # ==============================
 # ✅ CONFIGURATION
@@ -27,16 +27,27 @@ os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 # Load YOLO model once
 print("🔍 Loading YOLOv5 model...")
 model = torch.hub.load("ultralytics/yolov5", "yolov5s", pretrained=True)
+requests.get(f"{CLOUD_URL}/health", timeout=5)
 print("✅ YOLO model loaded successfully!")
 
 
 # ==============================
 # ✅ ALERT SENDER
 # ==============================
+import requests
+from requests.adapters import HTTPAdapter, Retry
+
 def send_alert_to_cloud(camera_name, frame):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    snapshot_path = os.path.join(SNAPSHOT_DIR, f"{camera_name}_{int(time.time())}.jpg")
+    message = f"Person detected by {camera_name} at {timestamp}"
+    snapshot_path = f"/tmp/{camera_name}_{int(time.time())}.jpg"
     cv2.imwrite(snapshot_path, frame)
+
+    # ✅ Resilient HTTP session
+    session = requests.Session()
+    retries = Retry(total=3, backoff_factor=2,
+                    status_forcelist=[500, 502, 503, 504])
+    session.mount("https://", HTTPAdapter(max_retries=retries))
 
     try:
         with open(snapshot_path, "rb") as img_file:
@@ -44,15 +55,28 @@ def send_alert_to_cloud(camera_name, frame):
             data = {
                 "camera_name": camera_name,
                 "timestamp": timestamp,
-                "message": f"Person detected by {camera_name} at {timestamp}"
+                "message": message
             }
-            response = requests.post(CLOUD_URL, data=data, files=files, timeout=10)
+            response = session.post(
+                f"{CLOUD_URL}/api/alerts",
+                data=data,
+                files=files,
+                timeout=30  # ⏱ longer timeout
+            )
             if response.status_code == 200:
                 print(f"[{camera_name}] ✅ Alert sent successfully.")
             else:
                 print(f"[{camera_name}] ⚠️ Failed to send alert: {response.status_code} {response.text}")
+    except requests.exceptions.Timeout:
+        print(f"[{camera_name}] ⚠️ Cloud request timed out — will retry next detection.")
     except Exception as e:
         print(f"[{camera_name}] ❌ Error sending alert: {e}")
+    finally:
+        # Clean up temp snapshot
+        try:
+            os.remove(snapshot_path)
+        except:
+            pass
 
 
 # ==============================
@@ -74,6 +98,8 @@ def monitor_camera(camera_name, source):
         if not ret:
             print(f"[ERROR] Failed to read from {camera_name}")
             break
+
+        camera_frames[camera_name] = frame.copy()
 
         # Perform detection
         results = model(frame)
