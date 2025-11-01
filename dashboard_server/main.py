@@ -101,18 +101,20 @@ async def create_alert(
     db: Session = Depends(get_db)
 ):
     """
-    Accepts alerts from local camera detector and saves to database.
+    Receives alerts from local camera detector and stores them in the database
+    (with optional snapshot upload).
     """
+    from datetime import datetime
+    import traceback, os
 
     try:
-        # Convert timestamp safely
-        from datetime import datetime
+        # ✅ Ensure valid datetime
         try:
             ts = datetime.fromisoformat(timestamp)
-        except:
+        except Exception:
             ts = datetime.utcnow()
 
-        # Save snapshot if present
+        # ✅ Prepare snapshot saving
         snapshot_url = None
         if snapshot:
             folder = "dashboard_server/static/snapshots"
@@ -120,24 +122,25 @@ async def create_alert(
             filename = f"{camera_name}_{int(datetime.utcnow().timestamp())}.jpg"
             filepath = os.path.join(folder, filename)
 
+            # Write image to disk
             with open(filepath, "wb") as f:
                 f.write(await snapshot.read())
 
+            # Store relative web path
             snapshot_url = f"/static/snapshots/{filename}"
 
-        # Store alert in DB
+        # ✅ Create and save alert in DB
         alert = Alert(
             camera_name=camera_name,
             timestamp=ts,
-            message=message or f"Alert from {camera_name}",
-            snapshot_url=snapshot_url  # ✅ fixed field name
+            message=message or f"Alert from {camera_name} at {timestamp}",
+            snapshot_url=snapshot_url  # <-- Correct field
         )
-
         db.add(alert)
         db.commit()
         db.refresh(alert)
 
-        # Return JSON
+        # ✅ Return confirmation
         return {
             "status": "ok",
             "id": alert.id,
@@ -145,9 +148,9 @@ async def create_alert(
         }
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return {"status": "error", "detail": str(e)}
+
 
         # ✅ Broadcast to connected dashboards
         broadcast_alert({
