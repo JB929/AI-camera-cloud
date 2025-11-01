@@ -20,7 +20,7 @@ CAMERAS = {
     # "Garage": "rtsp://192.168.0.105:554/stream"
 }
 
-CLOUD_URL = "https://ai-camera-cloud.onrender.com/api/alerts"
+CLOUD_URL = "https://ai-camera-cloud.onrender.com"
 SNAPSHOT_DIR = "snapshots"
 os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 
