@@ -12,6 +12,19 @@ from dashboard_server.database import SessionLocal, engine, Base
 from fastapi.responses import StreamingResponse
 import cv2
 Base.metadata.create_all(bind=engine)
+# --- TEMPORARY: Force rebuild database on startup ---
+from dashboard_server.models import Alert
+from dashboard_server.database import engine, Base
+import os
+
+db_path = "dashboard_server/dashboard.db"
+if os.path.exists(db_path):
+    os.remove(db_path)
+    print("🧹 Old database deleted, rebuilding...")
+
+Base.metadata.create_all(bind=engine)
+print("✅ New database initialized with snapshot_url column.")
+# ------------------------------------------------------
 
 # global dictionary to store frames per camera
 camera_frames = {}
