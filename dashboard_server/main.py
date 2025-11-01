@@ -11,6 +11,7 @@ from dashboard_server.auth import router as auth_router, get_current_user
 from dashboard_server.database import SessionLocal, engine, Base
 from fastapi.responses import StreamingResponse
 import cv2
+Base.metadata.create_all(bind=engine)
 
 # global dictionary to store frames per camera
 camera_frames = {}
