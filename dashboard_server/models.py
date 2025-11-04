@@ -7,11 +7,10 @@ class Alert(Base):
     __tablename__ = "alerts"
 
     id = Column(Integer, primary_key=True, index=True)
-    camera_name = Column(String, nullable=False)
+    camera_name = Column(String, index=true)
     timestamp = Column(DateTime, default=datetime.utcnow)
-    message = Column(String, nullable=True)
-    snapshot_url = Column(String, nullable=True)  # ✅ Added this line
+    message = Column(String)
+    snapshot_url = Column(String, nullable=True) 
 
-    def __repr__(self):
-        return f"<Alert(camera='{self.camera_name}', time='{self.timestamp}')>"
+   
 

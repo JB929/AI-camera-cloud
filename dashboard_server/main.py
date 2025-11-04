@@ -113,6 +113,19 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 # ✅ Endpoint to receive alerts + image upload from cameras
+from fastapi import FastAPI, Form, File, UploadFile, Depends, Request
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
+from datetime import datetime
+import os
+from dashboard_server.database import SessionLocal, get_db
+from dashboard_server.models import Alert
+
+app = FastAPI()
+
+UPLOAD_DIR = "dashboard_server/static/snapshots"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
 @app.post("/api/alerts")
 async def create_alert(
     camera_name: str = Form(...),
@@ -121,57 +134,48 @@ async def create_alert(
     snapshot: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
-    """
-    Accepts alerts from local camera detector and saves them to the SQLite DB.
-    """
+    """Receive alert + snapshot from local detector and save reliably."""
     try:
-        from datetime import datetime
+        print(f"🚨 Received alert from {camera_name} at {timestamp}")
 
-        # Parse timestamp safely
+        # --- Parse timestamp safely ---
         try:
-            ts = datetime.fromisoformat(timestamp)
+            ts = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
         except Exception:
             ts = datetime.utcnow()
 
-        # 💾 Save snapshot file (if provided)
+        # --- Save snapshot file ---
         snapshot_url = None
         if snapshot:
-            folder = "dashboard_server/static/snapshots"
-            os.makedirs(folder, exist_ok=True)
+            try:
+                filename = f"{camera_name}_{int(datetime.utcnow().timestamp())}.jpg"
+                filepath = os.path.join(UPLOAD_DIR, filename)
+                with open(filepath, "wb") as f:
+                    f.write(await snapshot.read())
+                snapshot_url = f"/static/snapshots/{filename}"
+                print(f"🖼️ Saved snapshot: {filepath}")
+            except Exception as e:
+                print(f"⚠️ Snapshot save failed: {e}")
 
-            filename = f"{camera_name}_{int(datetime.utcnow().timestamp())}.jpg"
-            filepath = os.path.join(folder, filename)
-
-            with open(filepath, "wb") as f:
-                f.write(await snapshot.read())
-
-            # ✅ This is what we’ll save in DB
-            snapshot_url = f"/static/snapshots/{filename}"
-
-        # 🧠 Create and save the alert entry
+        # --- Create DB entry ---
         alert = Alert(
             camera_name=camera_name,
             timestamp=ts,
-            message=message or f"Person detected by {camera_name} at {timestamp}",
-            snapshot_url=snapshot_url  # ✅ This line ensures snapshot is saved
+            message=message or f"Alert from {camera_name} at {timestamp}",
+            snapshot_url=snapshot_url
         )
-
         db.add(alert)
         db.commit()
         db.refresh(alert)
+        print(f"✅ Alert saved to DB: id={alert.id}")
 
-        print(f"✅ Alert saved: {camera_name}, snapshot={snapshot_url}")
-
-        return {
-            "status": "ok",
-            "id": alert.id,
-            "snapshot_url": snapshot_url
-        }
+        return {"status": "ok", "id": alert.id, "snapshot_url": snapshot_url}
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        db.rollback()
+        print(f"❌ Error while creating alert: {e}")
         return {"status": "error", "detail": str(e)}
+
 
 
 
