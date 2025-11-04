@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from jose import jwt, JWTError
 
 # ✅ Correct import path (Render-safe)
-from dashboard_server.database import get_session, init_db
+from dashboard_server.database import get_db, init_db
 
 router = APIRouter()
 SECRET_KEY = "supersecretkey"  # You can store in Render Environment variables later
@@ -39,7 +39,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 @router.post("/token")
 def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_db)
 ):
     if not user or not verify_password(form_data.password, user.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
