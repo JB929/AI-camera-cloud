@@ -3,8 +3,5 @@ services:
     name: ai-camera-cloud
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn dashboard_server.main:app --host 0.0.0.0 --port $PORT
-    envVars:
-      - key: PYTHONPATH
-        value: /opt/render/project/src
+    startCommand: uvicorn src.dashboard_server.main:app --host 0.0.0.0 --port $PORT
 
