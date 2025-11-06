@@ -3,11 +3,21 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# ✅ Use Render's guaranteed writable directory
-DB_DIR = "/opt/render/project/src/tmp"
-os.makedirs(DB_DIR, exist_ok=True)
+import os
+from pathlib import Path
 
+# ✅ Detect environment automatically
+if os.environ.get("RENDER"):
+    # On Render: use writable /opt/render/project/src/tmp
+    DB_DIR = "/opt/render/project/src/tmp"
+else:
+    # Local development: use dashboard_server/local_db folder
+    BASE_DIR = Path(__file__).resolve().parent
+    DB_DIR = BASE_DIR / "local_db"
+
+os.makedirs(DB_DIR, exist_ok=True)
 DB_PATH = os.path.join(DB_DIR, "dashboard.db")
+
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # ✅ Initialize SQLAlchemy engine & session

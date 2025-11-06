@@ -5,16 +5,39 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from datetime import datetime
+from pathlib import Path
 import os
+import cv2
+
 from dashboard_server.models import Base, Alert
 from dashboard_server.auth import router as auth_router, get_current_user
-from dashboard_server.database import SessionLocal, engine, Base
-from fastapi.responses import StreamingResponse
-import cv2
+from dashboard_server.database import SessionLocal, engine
+
+# ✅ Initialize FastAPI first
+app = FastAPI(title="AI Camera Cloud", version="2.5")
+print("✅ Loaded main.py from:", __file__)
+
+# ✅ Set up CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ✅ Use BASE_DIR for cross-platform paths
+BASE_DIR = Path(__file__).resolve().parent
+templates = Jinja2Templates(directory=BASE_DIR / "templates")
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+
 Base.metadata.create_all(bind=engine)
 # ✅ Ensure the database and tables are created on every startup
 from dashboard_server.database import Base, engine
 from dashboard_server.models import Alert
+
+from pathlib import Path
+
 
 print("🧠 Checking and creating database tables if needed...")
 Base.metadata.create_all(bind=engine)
@@ -39,10 +62,6 @@ camera_frames = {}
 
 # ✅ Initialize database correctly
 Base.metadata.create_all(bind=engine)
-
-# ✅ FastAPI app
-app = FastAPI(title="AI Camera Cloud", version="2.5")
-print("✅ Loaded main.py from:", __file__)
 
 # ✅ CORS setup
 app.add_middleware(
@@ -175,6 +194,11 @@ async def create_alert(
         db.rollback()
         print(f"❌ Error while creating alert: {e}")
         return {"status": "error", "detail": str(e)}
+
+@app.get("/api/alerts")
+async def get_alerts():
+    return {"status": "ok", "message": "API is working correctly!"}
+
 
 
 
