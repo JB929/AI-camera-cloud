@@ -13,6 +13,19 @@ from dashboard_server.models import Base, Alert
 from dashboard_server.auth import router as auth_router, get_current_user
 from dashboard_server.database import SessionLocal, engine
 
+# ✅ Initialize FastAPI first
+app = FastAPI(title="AI Camera Cloud", version="2.5")
+print("✅ Loaded main.py from:", __file__)
+
+# ✅ Set up CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],   
+    allow_headers=["*"],   
+)
+
 @app.get("/debug/templates")
 async def debug_templates():
     import os
@@ -24,18 +37,6 @@ async def debug_templates():
     else:
         return {"template_dir": str(templates_dir), "status": "MISSING"}
 
-# ✅ Initialize FastAPI first
-app = FastAPI(title="AI Camera Cloud", version="2.5")
-print("✅ Loaded main.py from:", __file__)
-
-# ✅ Set up CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # ✅ Use BASE_DIR for cross-platform paths
 BASE_DIR = Path(__file__).resolve().parent
@@ -149,7 +150,6 @@ import os
 from dashboard_server.database import SessionLocal, get_db
 from dashboard_server.models import Alert
 
-app = FastAPI()
 
 UPLOAD_DIR = "dashboard_server/static/snapshots"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
