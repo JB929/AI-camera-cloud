@@ -31,6 +31,10 @@ BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
 Base.metadata.create_all(bind=engine)
 # ✅ Ensure the database and tables are created on every startup
 from dashboard_server.database import Base, engine
@@ -87,12 +91,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-
-# ✅ Home route
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
 
 
 # ✅ List all alerts with snapshot preview
