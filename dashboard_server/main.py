@@ -13,6 +13,17 @@ from dashboard_server.models import Base, Alert
 from dashboard_server.auth import router as auth_router, get_current_user
 from dashboard_server.database import SessionLocal, engine
 
+@app.get("/debug/templates")
+async def debug_templates():
+    import os
+    from pathlib import Path
+    base = Path(__file__).resolve().parent
+    templates_dir = base / "templates"
+    if templates_dir.exists():
+        return {"template_dir": str(templates_dir), "files": os.listdir(templates_dir)}
+    else:
+        return {"template_dir": str(templates_dir), "status": "MISSING"}
+
 # ✅ Initialize FastAPI first
 app = FastAPI(title="AI Camera Cloud", version="2.5")
 print("✅ Loaded main.py from:", __file__)
