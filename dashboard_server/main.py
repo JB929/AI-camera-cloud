@@ -30,18 +30,6 @@ app.add_middleware(
     allow_headers=["*"],   
 )
 
-@app.get("/debug/templates")
-async def debug_templates():
-    import os
-    from pathlib import Path
-    base = Path(__file__).resolve().parent
-    templates_dir = base / "templates"
-    if templates_dir.exists():
-        return {"template_dir": str(templates_dir), "files": os.listdir(templates_dir)}
-    else:
-        return {"template_dir": str(templates_dir), "status": "MISSING"}
-
-
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
