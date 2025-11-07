@@ -17,6 +17,10 @@ from dashboard_server.database import SessionLocal, engine
 app = FastAPI(title="AI Camera Cloud", version="2.5")
 print("✅ Loaded main.py from:", __file__)
 
+BASE_DIR = Path(__file__).resolve().parent
+templates = Jinja2Templates(directory=BASE_DIR / "templates")
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+
 # ✅ Set up CORS
 app.add_middleware(
     CORSMiddleware,
@@ -37,11 +41,6 @@ async def debug_templates():
     else:
         return {"template_dir": str(templates_dir), "status": "MISSING"}
 
-
-# ✅ Use BASE_DIR for cross-platform paths
-BASE_DIR = Path(__file__).resolve().parent
-templates = Jinja2Templates(directory=BASE_DIR / "templates")
-app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
