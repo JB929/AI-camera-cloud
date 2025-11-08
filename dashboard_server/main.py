@@ -247,3 +247,22 @@ def video_feed(camera_name: str):
     return StreamingResponse(generate_mjpeg(camera_name),
                               media_type='multipart/x-mixed-replace; boundary=frame')
 
+# ----------------------------------------------------------
+# 🧾 GET RECENT ALERTS — (For dashboard display)
+# ----------------------------------------------------------
+@app.get("/api/recent_alerts")
+async def get_recent_alerts():
+    db = SessionLocal()
+    alerts = db.query(Alert).order_by(Alert.id.desc()).limit(10).all()
+    db.close()
+    return [
+        {
+            "camera_id": a.camera_id,
+            "timestamp": a.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            "snapshot_url": f"/static/snapshots/{os.path.basename(a.snapshot_url)}"
+            if a.snapshot_url else None,
+            "detected_objects": a.detected_objects or "N/A",
+        }
+        for a in alerts
+    ]
+
