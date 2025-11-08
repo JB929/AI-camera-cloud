@@ -14,11 +14,6 @@ from dashboard_server.auth import router as auth_router, get_current_user
 from dashboard_server.database import SessionLocal, engine
 import os
 
-DB_PATH = "/opt/render/project/src/tmp/dashboard.db"
-if os.path.exists(DB_PATH):
-    os.remove(DB_PATH)
-    print("🧹 Old database deleted for rebuild")
-
 # ✅ Initialize FastAPI first
 app = FastAPI(title="AI Camera Cloud", version="2.5")
 print("✅ Loaded main.py from:", __file__)
