@@ -1,4 +1,3 @@
-# dashboard_server/models.py
 from sqlalchemy import Column, Integer, String, DateTime
 from dashboard_server.database import Base
 from datetime import datetime
@@ -9,8 +8,8 @@ class Alert(Base):
     id = Column(Integer, primary_key=True, index=True)
     camera_name = Column(String, index=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
-    message = Column(String)
-    snapshot_url = Column(String, nullable=True) 
+    snapshot_url = Column(String) 
+    detected_objects = Column(String)
 
    
 
