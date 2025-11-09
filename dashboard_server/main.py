@@ -37,10 +37,13 @@ async def home(request: Request):
 
 # --- TEMP FIX: Force rebuild database schema on Render ---
 import os
-db_path = "dashboard_server/dashboard.db"
+
+db_path = "/opt/render/project/src/tmp/dashboard.db"
 if os.path.exists(db_path):
     os.remove(db_path)
-    print("🧹 Old database deleted — rebuilding new schema...")
+    print(f"🧹 Old database deleted at: {db_path}")
+else:
+    print(f"ℹ️ No existing database found at {db_path}, creating a new one...")
 # ----------------------------------------------------------
 
 Base.metadata.create_all(bind=engine)
