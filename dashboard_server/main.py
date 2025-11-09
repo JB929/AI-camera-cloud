@@ -44,19 +44,17 @@ print("🧠 Checking and synchronizing database schema...")
 
 db_path = "/opt/render/project/src/tmp/dashboard.db"
 
-# --- Force schema rebuild if columns missing ---
-try:
-    inspector = inspect(engine)
-    columns = [col["name"] for col in inspector.get_columns("alerts")]
-    if "message" not in columns or "detected_objects" not in columns:
-        print("⚙️  Schema mismatch detected — rebuilding alerts table...")
+# --- Always rebuild on next deploy to force fresh schema ---
+if os.path.exists(db_path):
+    try:
         os.remove(db_path)
-        print("🧹 Old database deleted.")
-except Exception as e:
-    print(f"ℹ️  No existing database found or inspect failed: {e}")
+        print(f"🧹 Forced deletion of old database at: {db_path}")
+    except Exception as e:
+        print(f"⚠️ Could not delete old database: {e}")
 
 
 Base.metadata.create_all(bind=engine)
+print("✅ Database tables recreated successfully.")
 # ✅ Ensure the database and tables are created on every startup
 from dashboard_server.database import Base, engine
 from dashboard_server.models import Alert
