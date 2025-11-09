@@ -35,16 +35,26 @@ app.add_middleware(
 async def home(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
-# --- TEMP FIX: Force rebuild database schema on Render ---
+from sqlalchemy import inspect
+from dashboard_server.database import Base, engine
+from dashboard_server.models import Alert
 import os
 
+print("🧠 Checking and synchronizing database schema...")
+
 db_path = "/opt/render/project/src/tmp/dashboard.db"
-if os.path.exists(db_path):
-    os.remove(db_path)
-    print(f"🧹 Old database deleted at: {db_path}")
-else:
-    print(f"ℹ️ No existing database found at {db_path}, creating a new one...")
-# ----------------------------------------------------------
+
+# --- Force schema rebuild if columns missing ---
+try:
+    inspector = inspect(engine)
+    columns = [col["name"] for col in inspector.get_columns("alerts")]
+    if "message" not in columns or "detected_objects" not in columns:
+        print("⚙️  Schema mismatch detected — rebuilding alerts table...")
+        os.remove(db_path)
+        print("🧹 Old database deleted.")
+except Exception as e:
+    print(f"ℹ️  No existing database found or inspect failed: {e}")
+
 
 Base.metadata.create_all(bind=engine)
 # ✅ Ensure the database and tables are created on every startup
