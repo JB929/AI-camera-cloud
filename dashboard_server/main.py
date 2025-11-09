@@ -35,6 +35,14 @@ app.add_middleware(
 async def home(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
+# --- TEMP FIX: Force rebuild database schema on Render ---
+import os
+db_path = "dashboard_server/dashboard.db"
+if os.path.exists(db_path):
+    os.remove(db_path)
+    print("🧹 Old database deleted — rebuilding new schema...")
+# ----------------------------------------------------------
+
 Base.metadata.create_all(bind=engine)
 # ✅ Ensure the database and tables are created on every startup
 from dashboard_server.database import Base, engine
