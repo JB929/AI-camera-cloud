@@ -44,14 +44,6 @@ print("🧠 Checking and synchronizing database schema...")
 
 db_path = "/opt/render/project/src/tmp/dashboard.db"
 
-# --- Always rebuild on next deploy to force fresh schema ---
-if os.path.exists(db_path):
-    try:
-        os.remove(db_path)
-        print(f"🧹 Forced deletion of old database at: {db_path}")
-    except Exception as e:
-        print(f"⚠️ Could not delete old database: {e}")
-
 
 Base.metadata.create_all(bind=engine)
 print("✅ Database tables recreated successfully.")
