@@ -157,55 +157,46 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 async def create_alert(
     camera_name: str = Form(...),
     timestamp: str = Form(...),
+    snapshot: UploadFile = File(...),
     message: str = Form(None),
-    snapshot: UploadFile = File(None),
-    db: Session = Depends(get_db)
+    detected_objects: str = Form(None),
 ):
-    """Receive alert + snapshot from local detector and save reliably."""
+    """Receive alerts from edge AI detector, save to DB, and return success."""
+
     try:
-        print(f"🚨 Received alert from {camera_name} at {timestamp}")
+        # Save uploaded snapshot to static directory
+        snapshots_dir = "dashboard_server/static/snapshots"
+        os.makedirs(snapshots_dir, exist_ok=True)
 
-        # --- Parse timestamp safely ---
-        try:
-            ts = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
-        except Exception:
-            ts = datetime.utcnow()
+        filename = f"{camera_name}_{int(datetime.now().timestamp())}.jpg"
+        file_path = os.path.join(snapshots_dir, filename)
 
-        # --- Save snapshot file ---
-        snapshot_url = None
-        if snapshot:
-            try:
-                filename = f"{camera_name}_{int(datetime.utcnow().timestamp())}.jpg"
-                filepath = os.path.join(UPLOAD_DIR, filename)
-                with open(filepath, "wb") as f:
-                    f.write(await snapshot.read())
-                snapshot_url = f"/static/snapshots/{filename}"
-                print(f"🖼️ Saved snapshot: {filepath}")
-            except Exception as e:
-                print(f"⚠️ Snapshot save failed: {e}")
+        with open(file_path, "wb") as buffer:
+            buffer.write(await snapshot.read())
 
-        # --- Create DB entry ---
-        alert = Alert(
+        snapshot_url = f"/static/snapshots/{filename}"
+
+        # ✅ Save alert in database
+        db = SessionLocal()
+        new_alert = Alert(
             camera_name=camera_name,
-            timestamp=ts,
-            message=message or f"Alert from {camera_name} at {timestamp}",
-            snapshot_url=snapshot_url
+            timestamp=timestamp,
+            snapshot_url=snapshot_url,
+            message=message or "Person detected",
+            detected_objects=detected_objects or "person",
         )
-        db.add(alert)
+        db.add(new_alert)
         db.commit()
-        db.refresh(alert)
-        print(f"✅ Alert saved to DB: id={alert.id}")
+        db.refresh(new_alert)
+        db.close()
 
-        return {"status": "ok", "id": alert.id, "snapshot_url": snapshot_url}
+        print(f"✅ Alert saved to DB: id={new_alert.id}")
+        return {"status": "ok", "id": new_alert.id}
 
     except Exception as e:
-        db.rollback()
         print(f"❌ Error while creating alert: {e}")
-        return {"status": "error", "detail": str(e)}
+        return {"error": str(e)}
 
-@app.get("/api/alerts")
-async def get_alerts():
-    return {"status": "ok", "message": "API is working correctly!"}
 
 
 
