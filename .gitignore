@@ -85,3 +85,20 @@ src/core/models/
 autotrain_buffer/
 temp_snapshots/
 snapshots/
+
+# ---- AI MODELS (DO NOT COMMIT) ----
+*.pt
+*.onnx
+*.engine
+*.tflite
+*.pb
+*.caffemodel
+*.prototxt
+
+models/
+pose_models/
+data/
+autotrain_buffer/
+temp_snapshots/
+snapshots/
+*.jsonl
