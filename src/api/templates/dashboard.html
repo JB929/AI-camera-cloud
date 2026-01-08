@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Camera Dashboard</title>
+    <style>
+        body { background:#111; color:#eee; font-family:Arial; }
+        .event { border:1px solid #333; padding:10px; margin:10px; }
+        img {
+            max-width: 300px;
+            cursor: pointer;
+            border: 1px solid #444;
+            border-radius: 6px;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        /* 🌟 Bloom / Glow effect */
+        img:hover {
+            transform: scale(1.05);
+            box-shadow:
+                0 0 8px rgba(0, 255, 150, 0.6),
+                0 0 20px rgba(0, 255, 150, 0.4),
+                0 0 40px rgba(0, 255, 150, 0.2);
+        }
+    </style>
+</head>
+
+<div id="planBadge" style="
+    margin:10px 0;
+    padding:6px 12px;
+    display:inline-block;
+    border-radius:6px;
+    font-weight:bold;
+    background:#1e1e1e;
+    border:1px solid #444;
+">
+    Loading plan…
+</div>
+
+<div id="snapshotModal" style="
+    display:none;
+    position:fixed;
+    top:0; left:0;
+    width:100%; height:100%;
+    background:rgba(0,0,0,0.85);
+    z-index:9999;
+    align-items:center;
+    justify-content:center;
+">
+    <div style="
+        background:#111;
+        padding:20px;
+        border-radius:10px;
+        max-width:90%;
+        max-height:90%;
+        display:flex;
+        gap:20px;
+    " onclick="event.stopPropagation()">
+
+        <img id="modalImage" style="
+            max-width:60vw;
+            max-height:80vh;
+            border-radius:8px;
+        ">
+                
+        <div id="modalInfo" style="
+            color:#eee;
+            min-width:220px;
+            font-size:14px;
+            
+        ">
+        </div>
+    </div>
+</div>
+
+<body>            
+<h1>📡 AI Camera Events</h1>
+<hr>
+
+<h2>📷 Camera Setup</h2>
+
+<button id="discoverBtn">🔍 Discover Cameras (ONVIF)</button>
+
+<div id="onvifResults" style="margin-top: 10px;"></div>
+
+<hr>
+<div id="events">Loading…</div>
+<div id="events">Loading…</div>
+
+<!-- ================= CAMERA ADD WIZARD ================= -->
+<button onclick="openAddCamera()">➕ Add Camera</button>
+
+<div id="addCameraModal" style="display:none; background:#111; padding:20px; border:1px solid #444;">
+  <h2>Add Camera</h2>
+
+  <button onclick="discoverCameras()">Discover Cameras</button>
+  <div id="cameraList"></div>
+
+  <input id="camUser" placeholder="Username">
+  <input id="camPass" placeholder="Password" type="password">
+
+  <select id="camBrand">
+    <option value="cpplus">CP Plus</option>
+    <option value="hikvision">Hikvision</option>
+    <option value="dahua">Dahua</option>
+    <option value="generic">Generic</option>
+  </select>
+
+  <button onclick="generateRTSP()">Generate RTSP</button>
+  <pre id="rtspOutput"></pre>
+
+  <button onclick="testRTSP()">Test Camera</button>
+  <div id="testResult"></div>
+
+  <button onclick="saveCamera()">Save Camera</button>
+</div>    
+<script>
+// ----------------------------
+// ONVIF CAMERA DISCOVERY UI
+// ----------------------------
+document.getElementById("discoverBtn").onclick = async () => {
+    const res = await fetch("/api/onvif/discover");
+    const data = await res.json();
+
+    const box = document.getElementById("onvifResults");
+    box.innerHTML = "";
+
+    if (!data.cameras || data.cameras.length === 0) {
+        box.innerHTML = "<i>No ONVIF cameras found</i>";
+        return;
+    }
+
+    data.cameras.forEach(cam => {
+        const div = document.createElement("div");
+        div.style.border = "1px solid #333";
+        div.style.padding = "8px";
+        div.style.margin = "8px 0";
+
+        div.innerHTML = `
+            <b>${cam.ip}</b> (${cam.brand || "unknown"})<br>
+            <button>Add Camera</button>
+        `;
+
+        div.querySelector("button").onclick = async () => {
+            const name = prompt("Camera name?", cam.ip);
+            if (!name) return;
+
+            const username = prompt("Username (optional)", "admin");
+            const password = prompt("Password (optional)", "");
+
+            const resp = await fetch("/api/onvif/add", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name,
+                    brand: cam.brand || "generic",
+                    ip: cam.ip,
+                    username,
+                    password
+                })
+            });
+
+            const out = await resp.json();
+            alert(out.status === "ok" ? "Camera added!" : JSON.stringify(out));
+        };
+
+        box.appendChild(div);
+    });
+};
+let EVENTS_CACHE = [];
+
+async function loadEvents() {
+    try {
+        console.log("TOKEN STRING:", "Bearer {{ DASHBOARD_TOKEN }}");
+
+        const res = await fetch("/events", {
+            headers: {
+                "Authorization": "Bearer {{ DASHBOARD_TOKEN }}"
+            }
+        });
+
+        console.log("STATUS:", res.status);
+
+        if (!res.ok) {
+            console.error("Failed to load events:", res.status);
+            return;
+        }
+
+        const data = await res.json();
+        console.log("EVENT DATA:", data);
+
+        EVENTS_CACHE = data.events || [];
+
+        const container = document.getElementById("events");
+        if (!container) return;
+
+        container.innerHTML = "";
+
+        if (EVENTS_CACHE.length === 0) {
+            container.innerHTML = "<i>No events yet</i>";
+            return;
+        }
+
+        EVENTS_CACHE.forEach((ev, index) => {
+            const div = document.createElement("div");
+
+            div.className =
+                "event " +
+                (ev.type === "PERSON_ENTER"
+                    ? "event-enter"
+                    : ev.type === "PERSON_EXIT"
+                    ? "event-exit"
+                    : "");
+
+            let html = `
+                <div class="meta">
+                    <b>${ev.type}</b> | Camera: ${ev.camera}<br>
+                    ${new Date(ev.timestamp * 1000).toLocaleString()}
+                </div>
+            `;
+
+            if (ev.payload) {
+                if (ev.payload.pose) {
+                    html += `<div>Pose: ${ev.payload.pose}</div>`;
+                }
+                if (ev.payload.action) {
+                    html += `<div>Action: ${ev.payload.action}</div>`;
+                }
+            }
+
+            if (ev.payload && ev.payload.snapshot) {
+                html += `
+                    <div class="snapshot">
+                        <img
+                            src="/${ev.payload.snapshot}"
+                            class="snapshot-img"
+                            data-src="/${ev.payload.snapshot}"
+                        />
+                    </div>
+                `;
+            }
+            div.innerHTML = html;
+            container.appendChild(div);
+        });
+    } catch (e) {
+        console.error("Failed to load events", e);
+    }
+}
+async function loadPlanStatus() {
+    try {
+        const res = await fetch("/api/subscription/status");
+        if (!res.ok) return;
+
+        const data = await res.json();
+
+        const badge = document.getElementById("planBadge");
+        if (!badge) return;
+
+        if (!data.active) {
+            badge.innerText = "PLAN: INACTIVE";
+            badge.style.color = "#ff5555";
+            return;
+        }
+
+        badge.innerText = "PLAN: " + data.plan.toUpperCase();
+        badge.style.color = data.plan === "pro" ? "#00ff9c" : "#ffaa00";
+
+    } catch (e) {
+        console.error("Failed to load plan status", e);
+    }
+}
+function openAddCamera() {
+    document.getElementById("addCameraModal").style.display = "block";
+}
+
+async function discoverCameras() {
+    const res = await fetch("/api/onvif/discover");
+    const data = await res.json();
+
+    const list = document.getElementById("cameraList");
+    list.innerHTML = "";
+
+    data.cameras.forEach(cam => {
+        const div = document.createElement("div");
+        div.innerText = cam.ip;
+        div.style.cursor = "pointer";
+        div.onclick = () => window.selectedIP = cam.ip;
+        list.appendChild(div);
+    });
+}
+
+async function generateRTSP() {
+    const brand = document.getElementById("camBrand").value;
+    const user = document.getElementById("camUser").value;
+    const pass = document.getElementById("camPass").value;
+
+    const res = await fetch(
+        `/api/onvif/rtsp?brand=${brand}&username=${user}&password=${pass}`
+    );
+    const data = await res.json();
+
+    if (data.cameras.length) {
+        window.generatedRTSP = data.cameras[0].rtsp;
+        document.getElementById("rtspOutput").innerText = window.generatedRTSP;
+    }
+}
+
+async function testRTSP() {
+    const res = await fetch("/api/camera/test", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ rtsp: window.generatedRTSP })
+    });
+
+    const data = await res.json();
+    document.getElementById("testResult").innerText =
+        data.ok ? "✅ Camera OK" : "❌ Failed";
+}
+
+async function saveCamera() {
+    const payload = {
+        name: prompt("Camera name"),
+        brand: document.getElementById("camBrand").value,
+        rtsp: window.generatedRTSP,
+        enabled: true
+    };
+
+    await fetch("/api/camera/add", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+    });
+
+    alert("Camera saved. Restart detector.");
+}
+
+// Initial load + polling
+loadEvents();
+// setInterval(loadEvents, refresh_ms);
+loadPlanStatus();
+</script>
+<script>
+document.addEventListener("click", (e) => {
+    const img = e.target.closest(".snapshot-img");
+    if (!img) return;
+
+    const src = img.dataset.src;
+    if (!src) return;
+
+    const overlay = document.getElementById("overlay");
+    const overlayImg = document.getElementById("overlay-img");
+    const overlayInfo = document.getElementById("overlay-info");
+
+    const index = Array.from(document.querySelectorAll(".snapshot-img")).indexOf(img);
+    const ev = EVENTS_CACHE[index];
+
+    overlayImg.src = src;
+
+    overlayInfo.innerHTML = `
+        <h3>${ev.type}</h3>
+        <p><b>Camera:</b> ${ev.camera}</p>
+        <p><b>Time:</b> ${new Date(ev.timestamp * 1000).toLocaleString()}</p>
+        <p><b>Pose:</b> ${ev.payload?.pose || "—"}</p>
+        <p><b>Action:</b> ${ev.payload?.action || "—"}</p>
+    `;
+
+    overlay.style.display = "flex";
+});
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeOverlay();
+});
+
+function closeOverlay() {
+    document.getElementById("overlay").style.display = "none";
+}
+</script>
+<div id="overlay" class="overlay" onclick="closeOverlay()">
+  <div class="overlay-card" onclick="event.stopPropagation()">
+    <img id="overlay-img" />
+    <div id="overlay-info"></div>
+  </div>
+</div>
+<style>
+.snapshot-img {
+    cursor: pointer;
+    border-radius: 10px;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.snapshot-img:hover {
+    transform: scale(1.03);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+}
+
+/* ===== Overlay Backdrop ===== */
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 12, 16, 0.65);
+    backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+}
+
+/* ===== Modal Card ===== */
+.overlay-card {
+    display: flex;
+    gap: 24px;
+    max-width: 92vw;
+    max-height: 88vh;
+    background: rgba(20, 22, 28, 0.85);
+    border-radius: 18px;
+    padding: 22px;
+    box-shadow:
+        0 30px 80px rgba(0,0,0,0.55),
+        inset 0 0 0 1px rgba(255,255,255,0.06);
+    animation: scaleIn 0.3s cubic-bezier(.2,.8,.2,1);
+}
+
+/* ===== Image ===== */
+#overlay-img {
+    max-width: 68vw;
+    max-height: 82vh;
+    object-fit: contain;
+    border-radius: 14px;
+    background: #000;
+}
+
+/* ===== Info Panel ===== */
+#overlay-info {
+    min-width: 240px;
+    max-width: 320px;
+    color: #e6e8ee;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+#overlay-info h3 {
+    margin-top: 0;
+    font-size: 18px;
+}
+
+/* ===== Animations ===== */
+@keyframes scaleIn {
+    from { transform: scale(0.96); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+}
+</style>
+</body>
+</html>
+""")
+
+

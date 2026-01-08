@@ -1,0 +1,64 @@
+system:
+  timezone: Asia/Kolkata
+  log_level: INFO
+server:
+  base_url: "http://127.0.0.1:8000"
+dashboard:
+  refresh_seconds: 3
+  token: jb_super_ai_camera_model_2025
+presence:
+  cooldown_seconds: 30
+  presence_confirm_frames: 2
+  absence_confirm_frames: 4
+motion:
+  idle_eps: 0.35
+  moving_threshold: 2.0
+alerts:
+  email_enabled: true
+  presence_enabled: true
+  fall_enabled: true
+paths:
+  snapshots_dir: snapshots
+  events_db: events.db
+actions:
+  min_sequence_len: 16
+  action_interval: 30
+cameras:
+  Front_Yard:
+    enabled: true
+    brand: 
+    rtsp:  http://192.0.0.4:8080/video
+  Garage:
+    enabled: false
+    brand: dahua
+    ip: null
+    username: null
+    password: null
+    active_hours:
+      start: 00:00
+      end: '23:59'
+    presence:
+      confirm_frames: 3
+      absence_frames: 8
+      cooldown_seconds: 15
+    motion:
+      idle_eps: 0.4
+      moving_threshold: 8.0
+    alerts:
+      presence: true
+      enter: true
+      exit: false
+      fall: true
+      action: false
+  innovate front_end:
+    enabled: false
+    brand: manual
+    rtsp: //admin:admin123@192.168.0.37:554/cam/realmonitor?channel=1&subtype=0&proto=tcp 
+subscription:
+  tier: "trial"   # trial | starter | pro | elite
+  camera_limit: 3
+  retention_days: 7
+  features:
+    zones: true
+    actions: true
+    export: false

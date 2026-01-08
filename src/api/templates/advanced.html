@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Advanced Camera Setup</title>
+    <style>
+        body {
+            background: #111;
+            color: #eee;
+            font-family: Arial;
+            padding: 30px;
+        }
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            font-size: 14px;
+        }
+        button {
+            background: #0f9;
+            border: none;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        .box {
+            max-width: 420px;
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .hint {
+            font-size: 13px;
+            color: #aaa;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>⚙️ Advanced Camera Setup</h2>
+
+<div class="box">
+    <label>Camera Name</label>
+    <input id="name" placeholder="Front_Yard">
+
+    <label>RTSP URL</label>
+    <input id="rtsp" placeholder="rtsp://user:pass@ip:554/...">
+
+    <button onclick="save()">Add Camera</button>
+
+    <div class="hint">
+        ⚠ Advanced users only. Incorrect RTSP may break stream.
+    </div>
+</div>
+
+<script>
+async function save() {
+    const name = document.getElementById("name").value;
+    const rtsp = document.getElementById("rtsp").value;
+
+    const res = await fetch("/api/cameras/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            name: name,
+            rtsp: rtsp,
+            enabled: true
+        })
+    });
+
+    const data = await res.json();
+
+    if (data.status === "ok") {
+        alert("Camera added. Restart detector.");
+    } else {
+        alert("Error: " + data.error);
+    }
+}
+</script>
+
+</body>
+</html>

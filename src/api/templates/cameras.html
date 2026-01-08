@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Camera Setup</title>
+  <style>
+    body { background:#111; color:#eee; font-family:Arial; }
+    button { padding:10px; margin:10px; cursor:pointer; }
+    .cam { border:1px solid #333; padding:10px; margin:10px; }
+  </style>
+</head>
+<body>
+
+<h1>📷 Camera Setup</h1>
+
+<button onclick="discover()">🔍 Discover Cameras</button>
+
+<div id="results"></div>
+
+<script>
+async function discover() {
+  const res = await fetch("/api/cameras/discover");
+  const data = await res.json();
+
+  const div = document.getElementById("results");
+  div.innerHTML = "";
+
+  data.cameras.forEach(cam => {
+    div.innerHTML += `
+      <div class="cam">
+        <b>${cam.manufacturer || "Unknown"}</b><br>
+        IP: ${cam.ip}<br>
+        Model: ${cam.model || "-"}<br><br>
+
+        <input placeholder="Name" id="name_${cam.ip}"><br>
+        <input placeholder="Username" id="user_${cam.ip}"><br>
+        <input placeholder="Password" id="pass_${cam.ip}" type="password"><br>
+
+        <button onclick="addCam('${cam.ip}')">➕ Add Camera</button>
+      </div>
+    `;
+  });
+}
+
+async function addCam(ip) {
+  const payload = {
+    name: document.getElementById("name_" + ip).value,
+    ip: ip,
+    username: document.getElementById("user_" + ip).value,
+    password: document.getElementById("pass_" + ip).value,
+  };
+
+  await fetch("/api/cameras/add", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  alert("Camera added! Restart detector.");
+}
+</script>
+
+</body>
+</html>

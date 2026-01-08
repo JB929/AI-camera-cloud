@@ -10,7 +10,7 @@ m = MultipartEncoder(
         "camera_name": "Front_Yard",
         "timestamp": "2025-10-30 19:45:00",
         "message": "Test alert with proper multipart encoding",
-        "snapshot": ("test.png", open("/Users/jb/Desktop/pictures/timeframe copy.png", "rb"), "image/png")
+        "snapshot": ("test.jpg", open("testimage1.jpg", "rb"), "image/jpg")
     }
 )
 

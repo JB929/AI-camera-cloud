@@ -1,0 +1,38 @@
+{"type": "PERSON_DETECTED", "camera": "Front_Yard", "timestamp": 1766360871, "payload": {"pose": "Standing", "action": "Unknown", "snapshot": "snapshots/Front_Yard_PersonDetected_20251222_051751.jpg"}}
+{"type": "PERSON_ENTER", "camera": "Front_Yard", "timestamp": 1766360872, "payload": {"pose": "Standing", "action": "Unknown", "snapshot": "snapshots/Front_Yard_ENTER_20251222_051752.jpg"}}
+{"type": "PERSON_EXIT", "camera": "Front_Yard", "timestamp": 1766360893, "payload": {}}
+{"type": "PERSON_DETECTED", "camera": "Front_Yard", "timestamp": 1766363166, "payload": {"pose": "Unknown", "action": "Unknown", "snapshot": "snapshots/Front_Yard_PersonDetected_20251222_055606.jpg"}}
+{"type": "PERSON_ENTER", "camera": "Front_Yard", "timestamp": 1766363167, "payload": {"pose": "Standing", "action": "Unknown", "snapshot": "snapshots/Front_Yard_ENTER_20251222_055607.jpg"}}
+{"type": "PERSON_EXIT", "camera": "Front_Yard", "timestamp": 1766363183, "payload": {}}
+{"type": "PERSON_DETECTED", "camera": "Front_Yard", "timestamp": 1766364650, "payload": {"pose": "Unknown", "action": "Unknown", "snapshot": "snapshots/Front_Yard_PersonDetected_20251222_062050.jpg"}}
+{"type": "PERSON_ENTER", "camera": "Front_Yard", "timestamp": 1766364651, "payload": {"pose": "Standing", "action": "Unknown", "snapshot": "snapshots/Front_Yard_ENTER_20251222_062051.jpg"}}
+{"type": "PERSON_EXIT", "camera": "Front_Yard", "timestamp": 1766364658, "payload": {}}
+{"type": "PERSON_DETECTED", "camera": "Front_Yard", "timestamp": 1766365694, "payload": {"pose": "Unknown", "action": "Unknown", "snapshot": "snapshots/Front_Yard_PersonDetected_20251222_063814.jpg"}}
+{"type": "PERSON_ENTER", "camera": "Front_Yard", "timestamp": 1766365695, "payload": {"pose": "Standing", "action": "Unknown", "snapshot": "snapshots/Front_Yard_ENTER_20251222_063815.jpg"}}
+{"type": "PERSON_EXIT", "camera": "Front_Yard", "timestamp": 1766365701, "payload": {}}
+{"type": "PERSON_DETECTED", "camera": "Front_Yard", "timestamp": 1766368598, "payload": {"pose": "Standing", "action": "Unknown", "snapshot": "snapshots/Front_Yard_PersonDetected_20251222_072638.jpg"}}
+{"type": "PERSON_ENTER", "camera": "Front_Yard", "timestamp": 1766368606, "payload": {"pose": "Standing", "action": "Standing", "snapshot": "snapshots/Front_Yard_ENTER_20251222_072646.jpg"}}
+{"type": "PERSON_EXIT", "camera": "Front_Yard", "timestamp": 1766368624, "payload": {}}
+{"type": "PERSON_DETECTED", "camera": "Front_Yard", "timestamp": 1766368828, "payload": {"pose": "Standing", "action": "Waving", "snapshot": "snapshots/Front_Yard_PersonDetected_20251222_073028.jpg"}}
+{"type": "PERSON_ENTER", "camera": "Front_Yard", "timestamp": 1766368829, "payload": {"pose": "Standing", "action": "Waving", "snapshot": "snapshots/Front_Yard_ENTER_20251222_073029.jpg"}}
+{"type": "PERSON_DETECTED", "camera": "Front_Yard", "timestamp": 1766370351, "payload": {"pose": "Standing", "action": "Unknown", "snapshot": "snapshots/Front_Yard_PersonDetected_20251222_075551.jpg"}}
+{"type": "PERSON_ENTER", "camera": "Front_Yard", "timestamp": 1766370356, "payload": {"pose": "Standing", "action": "Standing", "snapshot": "snapshots/Front_Yard_ENTER_20251222_075556.jpg"}}
+{"type": "PERSON_DETECTED", "camera": "Front_Yard", "timestamp": 1766370382, "payload": {"pose": "Standing", "action": "Standing", "snapshot": "snapshots/Front_Yard_PersonDetected_20251222_075622.jpg"}}
+{"type": "PERSON_DETECTED", "camera": "Front_Yard", "timestamp": 1766371047, "payload": {"pose": "Standing", "action": "Standing", "snapshot": "snapshots/Front_Yard_PersonDetected_20251222_080727.jpg"}}
+{"type": "PERSON_ENTER", "camera": "Front_Yard", "timestamp": 1766371049, "payload": {"pose": "Standing", "action": "Standing", "snapshot": "snapshots/Front_Yard_ENTER_20251222_080729.jpg"}}
+{"type": "PERSON_DETECTED", "camera": "Front_Yard", "timestamp": 1766371675, "payload": {"pose": "Standing", "action": "Unknown", "snapshot": "snapshots/Front_Yard_PersonDetected_20251222_081755.jpg"}}
+{"type": "PERSON_ENTER", "camera": "Front_Yard", "timestamp": 1766371677, "payload": {"pose": "Standing", "action": "Unknown", "snapshot": "snapshots/Front_Yard_ENTER_20251222_081757.jpg"}}
+{"type": "PERSON_DETECTED", "camera": "Front_Yard", "timestamp": 1766371966, "payload": {"pose": "Standing", "action": "Waving", "snapshot": "snapshots/Front_Yard_PersonDetected_20251222_082246.jpg"}}
+{"type": "PERSON_ENTER", "camera": "Front_Yard", "timestamp": 1766371968, "payload": {"pose": "Standing", "action": "Waving", "snapshot": "snapshots/Front_Yard_ENTER_20251222_082248.jpg"}}
+{"type": "PERSON_DETECTED", "camera": "Front_Yard", "timestamp": 1766372703, "payload": {"pose": "Lying", "action": "Sitting", "snapshot": "snapshots/Front_Yard_PersonDetected_20251222_083503.jpg"}}
+{"type": "PERSON_ENTER", "camera": "Front_Yard", "timestamp": 1766372705, "payload": {"pose": "Standing", "action": "Sitting", "snapshot": "snapshots/Front_Yard_ENTER_20251222_083505.jpg"}}
+{"type": "PERSON_EXIT", "camera": "Front_Yard", "timestamp": 1766372708, "payload": {}}
+{"type": "PERSON_DETECTED", "camera": "Front_Yard", "timestamp": 1766502969, "payload": {"pose": "Unknown", "action": "Unknown", "snapshot": "snapshots/Front_Yard_PersonDetected_20251223_204609.jpg"}}
+{"type": "PERSON_ENTER", "camera": "Front_Yard", "timestamp": 1766502970, "payload": {"pose": "Standing", "action": "Unknown", "snapshot": "snapshots/Front_Yard_PersonDetected_20251223_204609.jpg"}}
+{"type": "PERSON_DETECTED", "camera": "Front_Yard", "timestamp": 1766531779, "payload": {"pose": "Unknown", "action": "Unknown", "snapshot": "snapshots/Front_Yard_PersonDetected_20251224_044619.jpg"}}
+{"type": "PERSON_ENTER", "camera": "Front_Yard", "timestamp": 1766531782, "payload": {"pose": "Standing", "action": "Unknown", "snapshot": "snapshots/Front_Yard_PersonDetected_20251224_044619.jpg"}}
+{"type": "PERSON_EXIT", "camera": "Front_Yard", "timestamp": 1766531785, "payload": {}}
+{"type": "PERSON_DETECTED", "camera": "Front_Yard", "timestamp": 1766534033, "payload": {"pose": "Standing", "action": "Unknown", "snapshot": "snapshots/Front_Yard_PersonDetected_20251224_052353.jpg"}}
+{"type": "PERSON_ENTER", "camera": "Front_Yard", "timestamp": 1766534033, "payload": {"pose": "Standing", "action": "Other", "snapshot": "snapshots/Front_Yard_PersonDetected_20251224_052353.jpg"}}
+{"type": "PERSON_EXIT", "camera": "Front_Yard", "timestamp": 1766534038, "payload": {}}
+{"type": "PERSON_ENTER", "camera": "Front_Yard", "timestamp": 1766534043, "payload": {"pose": "Standing", "action": "Other", "snapshot": "snapshots/Front_Yard_PersonDetected_20251224_052353.jpg"}}

@@ -3,4 +3,6 @@ uvicorn
 sqlalchemy
 passlib[bcrypt]
 python-jose
+cryptography
+from cvzone.PoseModule import PoseDetector
 

@@ -1,0 +1,575 @@
+import os
+import sys
+import time
+import json
+import threading
+from collections import deque, Counter
+from datetime import datetime
+
+import numpy as np
+import cv2
+import requests
+
+# Try to import ultralytics YOLO (v8/v9)
+try:
+    from ultralytics import YOLO
+    YOLO_AVAILABLE = True
+except Exception:
+    YOLO_AVAILABLE = False
+
+# Try to import torch for yolov5 via hub (optional)
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except Exception:
+    TORCH_AVAILABLE = False
+
+# Action predictor (trained model wrapper)
+try:
+    from src.core.action_recognition.action_predictor import predict_action
+except Exception:
+    def predict_action(seq, movenet_pose=None):
+        return "Unknown", 0.0
+
+# Person identifier (optional). Keep or stub.
+try:
+    from person_identifier import identify_person
+except Exception:
+    def identify_person(crop):
+        return "Unknown"
+
+# --------------------------
+# Configuration
+# --------------------------
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+CAMERAS = {
+    "Front_Yard": 0,  # webcam index or RTSP/HTTP url
+}
+
+MODELS = {
+    "pose": "models/yolov8s-pose.pt",   # path to ultralytics pose model
+    "yolov5_det": None,                  # if None, we try torch.hub load
+}
+
+CLOUD_URL = os.environ.get("AI_CAMERA_CLOUD_URL", "https://ai-camera-cloud.onrender.com")
+AUTOTRAIN_SAVE_DIR = "autotrain_buffer"
+os.makedirs(AUTOTRAIN_SAVE_DIR, exist_ok=True)
+DATA_LOG_DIR = "data/logs"
+SNAPSHOT_DIR = "data/snapshots"
+os.makedirs(DATA_LOG_DIR, exist_ok=True)
+os.makedirs(SNAPSHOT_DIR, exist_ok=True)
+
+# Intervals & thresholds
+POSE_INTERVAL = 0.6       # seconds between pose detections
+ACTION_INTERVAL = 5.0     # seconds between action recognitions
+SMOOTH_WINDOW = 5         # fusion smoothing window
+ALERT_COOLDOWN = 15       # seconds per camera+alert_type
+FALL_CONF_THRESHOLD = 0.75
+MOVEMENT_THRESHOLD = 0.02  # normalized coordinate movement threshold
+AUTOTRAIN_CONF_TH = 0.60
+
+# --------------------------
+# Global state (per-camera dicts)
+# --------------------------
+last_pose_time = {}
+last_action_time = {}
+last_fusion_status = {}
+prev_keypoints = {}
+action_sequence = {}
+unified_history = {}
+alert_last_sent = {}
+last_snapshot_time = {}
+display_frames = {}
+
+# Load models
+pose_model = None
+yolo5_model = None
+USE_POSE = False
+USE_YOLO5 = False
+
+if YOLO_AVAILABLE:
+    pose_path = MODELS.get("pose")
+    if pose_path and os.path.exists(pose_path):
+        try:
+            pose_model = YOLO(pose_path)
+            USE_POSE = True
+            print(f"[MODEL] Loaded pose model: {pose_path}")
+        except Exception as e:
+            print(f"[MODEL] Failed to load pose model {pose_path}: {e}")
+    else:
+        print(f"[MODEL] Pose model not found at {pose_path}; pose disabled.")
+else:
+    print("[MODEL] ultralytics YOLO not available; pose disabled.")
+
+# try to load YOLOv5 (object detection) via torch.hub as optional
+if TORCH_AVAILABLE:
+    try:
+        yolo5_model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
+        USE_YOLO5 = True
+        print("[MODEL] Loaded YOLOv5s (object detection) via torch.hub")
+    except Exception as e:
+        print(f"[MODEL] YOLOv5 load failed or skipped: {e}")
+else:
+    print("[MODEL] torch not available; YOLOv5 disabled.")
+
+# --------------------------
+# Utilities
+# --------------------------
+
+    def _worker():
+        while True:
+            try:
+                for name, frm in list(display_frames.items()):
+                    if frm is None:
+                        continue
+                    try:
+                        cv2.imshow(f"Camera: {name}", frm)
+                    except cv2.error:
+                        pass
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    print("[INFO] Quit requested (display)")
+                    os._exit(0)
+                time.sleep(0.03)
+            except Exception as e:
+                print(f"[display_worker] error: {e}")
+                time.sleep(0.5)
+
+    t = threading.Thread(target=_worker, daemon=True, name="display_worker")
+    t.start()
+
+
+def detect_pose_wrapper(frame):
+    """
+    Robust pose extraction from ultralytics YOLO pose result.
+    Returns:
+      - np.array shape (17,3) with [x, y, conf] in pixel coords (NOT normalized),
+      - or None if no person / keypoints found.
+    """
+    global pose_model, USE_POSE
+    if not USE_POSE or pose_model is None:
+        return None
+
+    try:
+        res = pose_model(frame, verbose=False)   # ultralytics result list
+    except Exception as e:
+        print(f"[pose] model call error: {e}")
+        return None
+
+    if not res or len(res) == 0:
+        return None
+
+    r = res[0]
+
+    # Guarantee a Keypoints-like object exists
+    if not hasattr(r, "keypoints") or r.keypoints is None:
+        return None
+
+    # Try safe access patterns in order (most robust)
+    try:
+        # Preferred: r.keypoints.data -> tensor (N,17,3)
+        if hasattr(r.keypoints, "data"):
+            kp_tensor = r.keypoints.data  # torch tensor
+            kp = kp_tensor.cpu().numpy()  # (N,17,3) or (N,17,2)
+            if kp is None or kp.size == 0 or kp.shape[0] == 0:
+                return None
+            k = kp[0].astype(np.float32)
+        elif hasattr(r.keypoints, "xy"):
+            arr = r.keypoints.xy  # maybe list of arrays
+            if arr is None or len(arr) == 0:
+                return None
+            k = np.array(arr[0], dtype=np.float32)
+        elif hasattr(r.keypoints, "xyn"):
+            arr = r.keypoints.xyn
+            if arr is None or len(arr) == 0:
+                return None
+            # xyn is normalized coords -> convert to pixels below
+            k = np.array(arr[0], dtype=np.float32)
+        else:
+            # fallback try r.keypoints.numpy() etc
+            try:
+                k = np.array(r.keypoints, dtype=np.float32)
+            except Exception:
+                return None
+
+        # At this point k is (17,2) or (17,3). If normalized (x in [0..1]) convert to pixel coords
+        h, w = frame.shape[:2]
+
+        # If shape (17,2) -> add conf column = 1.0
+        if k.ndim == 2 and k.shape[1] == 2:
+            confcol = np.ones((k.shape[0], 1), dtype=np.float32)
+            k = np.concatenate([k, confcol], axis=1)
+
+        # If keypoints appear normalized (values <= 1.01) and < 2 pixels, treat as normalized
+        if np.nanmax(k[:, 0]) <= 1.01 and np.nanmax(k[:, 1]) <= 1.01:
+            # normalized -> pixel coords
+            k_px = k.copy()
+            k_px[:, 0] = (k_px[:, 0] * w).astype(np.float32)
+            k_px[:, 1] = (k_px[:, 1] * h).astype(np.float32)
+            # keep confidences as-is if present
+            k = k_px
+
+        # final sanity: ensure shape (17,3)
+        if k.shape[0] != 17:
+            return None
+        if k.shape[1] == 2:
+            confcol = np.ones((17, 1), dtype=np.float32)
+            k = np.concatenate([k, confcol], axis=1)
+
+        return k.astype(np.float32)
+
+    except Exception as e:
+        # Print debug for weird Keypoints types
+        print("[POSE ERROR] detect_pose_wrapper failed:", e)
+        # Helpful debug: show Keypoints attrs
+        try:
+            attrs = [a for a in dir(r.keypoints) if not a.startswith("_")]
+            print("Keypoints attrs:", attrs)
+        except Exception:
+            pass
+        return None
+
+
+
+def send_alert_background(camera_name, frame, message):
+    def task():
+        try:
+            os.makedirs('temp_snapshots', exist_ok=True)
+            fname = f"{camera_name}_{int(time.time())}.jpg"
+            path = os.path.join('temp_snapshots', fname)
+            cv2.imwrite(path, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+        except Exception as e:
+            print(f"[alert] snapshot save failed: {e}")
+            return
+        try:
+            with open(path, 'rb') as f:
+                files = {'snapshot': f}
+                data = {'camera_name': camera_name, 'message': message}
+                r = requests.post(f"{CLOUD_URL}/api/alerts", data=data, files=files, timeout=8)
+                print(f"[alert] cloud response: {r.status_code}")
+        except Exception as e:
+            print(f"[alert] send failed: {e}")
+    threading.Thread(target=task, daemon=True).start()
+
+
+def should_send_alert(camera_name, alert_type, cooldown=ALERT_COOLDOWN):
+    key = (camera_name, alert_type)
+    now = time.time()
+    last = alert_last_sent.get(key, 0)
+    if now - last > cooldown:
+        alert_last_sent[key] = now
+        return True
+    return False
+
+
+def draw_overlay(frame, keypoints, label, conf):
+    try:
+        h, w = frame.shape[:2]
+        txt = f"{label} {conf:.2f}"
+        cv2.putText(frame, txt, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+        if keypoints is None:
+            return frame
+        kp = np.array(keypoints)
+        if kp.ndim == 2 and (kp.shape[0] == 17) and (kp.shape[1] in (2,3)):
+            kp_px = kp.copy()
+            # If normalized (0..1) convert to pixel coords
+            if np.nanmax(kp_px[:,0]) <= 1.01 and np.nanmax(kp_px[:,1]) <= 1.01:
+                kp_px[:,0] = kp_px[:,0] * w
+                kp_px[:,1] = kp_px[:,1] * h
+            skeleton = [(0,1),(0,2),(1,3),(2,4),(5,6),(5,7),(7,9),(6,8),(8,10),(11,12),(5,11),(6,12)]
+            for a,b in skeleton:
+                if not (np.isnan(kp_px[a,0]) or np.isnan(kp_px[b,0])):
+                    xa,ya = int(kp_px[a,0]), int(kp_px[a,1])
+                    xb,yb = int(kp_px[b,0]), int(kp_px[b,1])
+                    cv2.line(frame, (xa,ya), (xb,yb), (0,200,0), 2)
+            for x,y,*_ in kp_px:
+                if not (np.isnan(x) or np.isnan(y)):
+                    cv2.circle(frame, (int(x), int(y)), 3, (0,120,255), -1)
+    except Exception as e:
+        print(f"[overlay] {e}")
+    return frame
+
+
+# --------------------------
+# Main per-camera monitor
+# --------------------------
+
+def monitor_camera(camera_name, camera_source):
+    print(f"[INFO] Starting monitor for {camera_name} -> {camera_source}")
+    cap = cv2.VideoCapture(camera_source)
+    if not cap.isOpened():
+        print(f"[ERROR] Could not open source {camera_source}")
+        return
+
+    # init per-camera state
+    last_pose_time.setdefault(camera_name, 0.0)
+    last_action_time.setdefault(camera_name, 0.0)
+    last_fusion_status.setdefault(camera_name, "Unknown")
+    prev_keypoints.setdefault(camera_name, None)
+    action_sequence.setdefault(camera_name, deque(maxlen=32))
+    unified_history.setdefault(camera_name, deque(maxlen=SMOOTH_WINDOW))
+    last_snapshot_time.setdefault(camera_name, 0.0)
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret or frame is None:
+            time.sleep(0.05)
+            continue
+
+        now = time.time()
+
+        # STEP 1: Pose detection (slow interval)
+        keypoints = None
+        pose_label = last_fusion_status.get(camera_name, "Unknown")
+
+        if now - last_pose_time[camera_name] >= POSE_INTERVAL:
+            last_pose_time[camera_name] = now
+
+            kp = detect_pose_wrapper(frame)
+
+            if kp is None:
+                print(f"[{camera_name}] DEBUG: detect_pose_wrapper -> None")
+                keypoints = prev_keypoints.get(camera_name, None)
+                pose_label = last_fusion_status.get(camera_name, "Unknown")
+
+            else:
+                print(f"[{camera_name}] DEBUG: kp shape {kp.shape}, conf {kp[0,2]:.2f}")
+                keypoints = kp
+
+                # store for motion & action
+                prev_keypoints[camera_name] = keypoints.copy()
+
+                try:
+                    L_sh = keypoints[5]; R_sh = keypoints[6]
+                    L_hp = keypoints[11]; R_hp = keypoints[12]
+                    mid_sh = (L_sh + R_sh) / 2.0
+                    mid_hp = (L_hp + R_hp) / 2.0
+                    vertical = abs(mid_sh[1] - mid_hp[1])
+                    horiz = abs(mid_sh[0] - mid_hp[0])
+
+                    # If coordinates look normalized (values <=1), scale heuristics
+                    if vertical <= 1.01:
+                        s = max(frame.shape[:2])
+                        vert_px = vertical * s
+                        horiz_px = horiz * s
+                    else:
+                        vert_px = vertical
+                        horiz_px = horiz
+
+                    ratio = horiz_px / (vert_px + 1e-6)
+
+                    if ratio > 1.6:
+                        pose_label = "Lying"
+                    elif vert_px < 40:
+                        pose_label = "Sitting"
+                    else:
+                        pose_label = "Standing"
+
+                except Exception as e:
+                    print(f"[{camera_name}] pose calc error:", e)
+                    pose_label = "Unknown"
+
+        else:
+            # reuse previous pose/keypoints
+            keypoints = prev_keypoints.get(camera_name, None)
+            pose_label = last_fusion_status.get(camera_name, "Unknown")
+
+
+        # STEP 2: Motion score
+        movement_score = 0.0
+        is_still = True
+        try:
+            prev = prev_keypoints.get(camera_name)
+            if keypoints is not None and prev is not None:
+                valid = (~np.isnan(keypoints[:,0])) & (~np.isnan(prev[:,0]))
+                if valid.sum() > 0:
+                    diffs = np.linalg.norm(keypoints[valid,:2] - prev[valid,:2], axis=1)
+                    movement_score = float(np.mean(diffs))
+                    is_still = movement_score < MOVEMENT_THRESHOLD
+            prev_keypoints[camera_name] = keypoints
+        except Exception as e:
+            print(f"[motion] {e}")
+            movement_score = 0.0
+            is_still = True
+
+        # STEP 3: Action recognition (every ACTION_INTERVAL)
+        action_label = "Unknown"
+        action_conf = 0.0
+        if keypoints is not None:
+            action_sequence[camera_name].append(keypoints)
+
+        if now - last_action_time[camera_name] >= ACTION_INTERVAL:
+            last_action_time[camera_name] = now
+            seq = list(action_sequence[camera_name])
+            if len(seq) >= 6:
+                try:
+                    action_label, action_conf = predict_action(seq, movenet_pose=pose_label)
+                except Exception as e:
+                    print(f"[action] predict failed: {e}")
+                    action_label, action_conf = "Unknown", 0.0
+                # Autotrain: save only rare or uncertain samples
+                try:
+                    # Save only if action_conf is extremely low AND pose_label is not Unknown
+                    if (action_conf < 0.35) and (pose_label != "Unknown") and (len(seq) >= 12):
+                        fname = os.path.join(
+                            AUTOTRAIN_SAVE_DIR,
+                            f"{camera_name}_{int(time.time())}.npy"
+                        )
+                        np.save(fname, np.array(seq[-16:], dtype=np.float32))
+                        print(f"[AUTOLEARN] saved {fname}")
+                except Exception as e:
+                    print(f"[autolearn] {e}")
+
+                
+        # STEP 4: Fusion & smoothing
+        final_status = pose_label
+        try:
+            if action_label == "Falling" and action_conf > 0.85 and movement_score > 0.15:
+                final_status = "Falling"
+            elif action_label == "Running" and action_conf > 0.65 and movement_score > 0.20:
+                final_status = "Running"
+            elif action_label == "Waving" and action_conf > 0.60 and pose_label != "Lying":
+                final_status = "Waving"
+            elif action_label == "Sitting" and action_conf > 0.65 and pose_label == "Sitting":
+                final_status = "Sitting"
+            else:
+                final_status = pose_label
+
+            unified_history[camera_name].append(final_status)
+            most = Counter(unified_history[camera_name]).most_common(1)
+            if most:
+                final_status = most[0][0]
+            last_fusion_status[camera_name] = final_status
+        except Exception as e:
+            print(f"[fusion] {e}")
+            final_status = pose_label
+            last_fusion_status[camera_name] = final_status
+
+        # STEP 5: High-priority fall alert
+        try:
+            conf = float(action_conf or 0.0)
+            if final_status == "Falling" and conf > FALL_CONF_THRESHOLD and movement_score > 0.12:
+                if should_send_alert(camera_name, "fall"):
+                    print(f"[{camera_name}] ALERT hard fall (conf={conf:.2f})")
+                    send_alert_background(camera_name, frame, f"Fall detected ({conf:.2f})")
+        except Exception as e:
+            print(f"[fall_alert] {e}")
+
+        # Optional: YOLOv5 object detection for environment
+        detections = None
+        if USE_YOLO5 and yolo5_model is not None:
+            try:
+                res = yolo5_model(frame)
+                detections = res.pandas().xyxy[0]
+                for _, row in detections.iterrows():
+                    if row['name'] == 'person' and float(row['confidence']) > 0.4:
+                        x_center = (row['xmin'] + row['xmax']) / 2
+                        y_center = (row['ymin'] + row['ymax']) / 2
+                        if camera_name in globals().get('ZONES', {}) and is_inside_zone(x_center, y_center, ZONES[camera_name]):
+                            if should_send_alert(camera_name, 'zone'):
+                                send_alert_background(camera_name, frame, f"Person in restricted zone: {camera_name}")
+            except Exception:
+                pass
+
+        # Person identification (best-effort)
+        person_name = "Unknown"
+        try:
+            if detections is not None and not detections.empty:
+                rows = detections[detections['name'] == 'person']
+                if len(rows) > 0:
+                    r = rows.iloc[0]
+                    x1,y1,x2,y2 = int(r['xmin']), int(r['ymin']), int(r['xmax']), int(r['ymax'])
+                    crop = frame[max(0,y1):max(0,y2), max(0,x1):max(0,x2)]
+                    if crop is not None and crop.size > 0:
+                        person_name = identify_person(crop)
+        except Exception:
+            person_name = "Unknown"
+
+        # Visualization + logging
+        try:
+            display = frame.copy()
+            display = draw_overlay(display, keypoints, final_status, float(action_conf or 0.0))
+            if person_name != "Unknown":
+                cv2.putText(display, f"ID: {person_name}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200,200,0), 2)
+            display_frames[camera_name] = display
+
+            # log to JSONL
+            log_entry = {
+                'time': time.time(),
+                'camera': camera_name,
+                'pose': pose_label,
+                'action': action_label,
+                'final': final_status,
+                'person': person_name,
+                'confidence': float(action_conf or 0.0),
+                'motion': float(movement_score)
+            }
+            day = datetime.now().strftime('%Y-%m-%d')
+            with open(os.path.join(DATA_LOG_DIR, f"{day}_{camera_name}.jsonl"), 'a') as f:
+                f.write(json.dumps(log_entry) + "\n")
+
+            nowt = time.time()
+            if nowt - last_snapshot_time.get(camera_name, 0) > 5.0:
+                fname = os.path.join(SNAPSHOT_DIR, f"{camera_name}_{int(nowt)}.jpg")
+                cv2.imwrite(fname, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+                last_snapshot_time[camera_name] = nowt
+        except Exception as e:
+            print(f"[display/log] {e}")
+
+        # small sleep to keep CPU sane
+        time.sleep(0.02)
+
+    cap.release()
+
+
+# --------------------------
+# Helpers: zone check
+# --------------------------
+
+def is_inside_zone(x, y, pts):
+    try:
+        contour = np.array(pts, dtype=np.int32)
+        return cv2.pointPolygonTest(contour, (int(x), int(y)), False) >= 0
+    except Exception:
+        return False
+
+
+# --------------------------
+# Entrypoint
+# --------------------------
+if __name__ == "__main__":
+    print("[INFO] Multi-camera monitor starting...")
+
+    # Start each camera monitor in background threads
+    threads = []
+    for name, src in CAMERAS.items():
+        t = threading.Thread(target=monitor_camera, args=(name, src), daemon=True)
+        t.start()
+        threads.append(t)
+        time.sleep(0.3)
+
+    # === MAIN THREAD DISPLAY LOOP (MAC-SAFE) ===
+    while True:
+        try:
+            for cam_name in list(display_frames.keys()):
+                frame = display_frames.get(cam_name)
+                if frame is not None and frame.size > 0:
+                    cv2.imshow(f"Camera: {cam_name}", frame)
+
+            if cv2.waitKey(1) == ord('q'):
+                print("[INFO] Quit requested. Closing...")
+                break
+
+        except KeyboardInterrupt:
+            print("[INFO] Keyboard interrupt received. Exiting...")
+            break
+        except Exception as e:
+            print(f"[MAIN DISPLAY] Error: {e}")
+            time.sleep(0.1)
+
+    cv2.destroyAllWindows()
+
+
+

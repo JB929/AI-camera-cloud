@@ -1,0 +1,28 @@
+import torch
+from torch.serialization import add_safe_globals
+from ultralytics import YOLO
+from ultralytics.nn.tasks import DetectionModel
+
+# 1️⃣ Allow YOLOv9 model class for loading
+add_safe_globals([DetectionModel])
+
+print("🔄 Loading original YOLOv9 checkpoint with safe globals...")
+
+# 2️⃣ Load with safe mode disabled
+state = torch.load("models/yolov9c.pt", map_location="cpu", weights_only=False)
+
+print("💾 Extracting model weights...")
+
+# 3️⃣ Extract only weights (state_dict)
+if "model" in state:
+    weights = state["model"].state_dict()
+elif "state_dict" in state:
+    weights = state["state_dict"]
+else:
+    raise RuntimeError("❌ Could not locate state_dict in YOLOv9 checkpoint!")
+
+# 4️⃣ Save safe version
+torch.save(weights, "models/yolov9c-safe.pt")
+
+print("✅ Conversion complete → models/yolov9c-safe.pt")
+

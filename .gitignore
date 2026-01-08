@@ -1,44 +1,45 @@
-# Python cache and environment
+# ===============================
+# Runtime / Generated Data
+# ===============================
+autotrain_buffer/
+temp_snapshots/
+snapshots/
+*.npy
+*.jpg
+*.jpeg
+*.png
+
+# ===============================
+# Databases / State
+# ===============================
+*.db
+*.sqlite
+*.sqlite3
+
+# ===============================
+# Python
+# ===============================
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .env
-.venv
-env/
-venv/
-ai_camera_cloud_env/
-
-# macOS system files
-.DS_Store
-
-# Secrets or local config
-config.json
-*.sqlite3
-*.db
-*.pem
-*.crt
-*.key
-
-# Credentials or private keys
-*.env
-*.secret
-*.token
-
-# Ignore Python virtual environments
-venv/
 .venv/
+venv/
 env/
-*_env/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.db
 
-# Ignore local build or IDE stuff
-build/
-dist/
+# ===============================
+# OS / IDE
+# ===============================
+.DS_Store
 .idea/
 .vscode/
 
+# ===============================
+# Secrets
+# ===============================
+*.pem
+*.crt
+*.key
+*.token
+*.secret

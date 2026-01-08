@@ -1,0 +1,8 @@
+{
+  "schedule": {
+    "enabled": true,
+    "start": "20:00",
+    "end": "09:00"
+  }
+}
+

@@ -1,0 +1,9 @@
+{
+  "customer_id": "jb_internal_test",
+  "customer_name": "JB (Internal)",
+  "plan": "PRO",
+  "issued_at": "2025-12-01",
+  "expires_at": "2026-02-09",
+  "grace_days": 7,
+  "license_id": "LIC-TEST-001"
+}
