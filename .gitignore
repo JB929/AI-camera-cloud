@@ -67,6 +67,7 @@ src/core/models/
 *.pb
 *.tflite
 *.tar.gz
+*.engine
 
 models/
 data/
@@ -85,6 +86,8 @@ src/core/models/
 autotrain_buffer/
 temp_snapshots/
 snapshots/
+events/
+*.jsonl
 
 # ---- AI MODELS (DO NOT COMMIT) ----
 *.pt
