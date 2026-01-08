@@ -43,3 +43,45 @@ env/
 *.key
 *.token
 *.secret
+
+# ML models / weights (DO NOT COMMIT)
+*.pb
+*.tflite
+*.caffemodel
+*.weights
+*.onnx
+*.tar.gz
+
+movenet*/
+pose_models/
+variables/
+yolov5/
+src/core/models/
+
+# ===============================
+# AI MODELS & DATA (DO NOT COMMIT)
+# ===============================
+*.pt
+*.pth
+*.onnx
+*.pb
+*.tflite
+*.tar.gz
+
+models/
+data/
+datasets/
+training/
+logs/
+*.jsonl
+
+# YOLO / MoveNet / Pose models
+yolov*
+movenet*
+pose_models/
+src/core/models/
+
+# Runtime outputs
+autotrain_buffer/
+temp_snapshots/
+snapshots/
